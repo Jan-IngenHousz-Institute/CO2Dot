@@ -1,0 +1,130 @@
+(footprint "TEMD7100"
+	(version 20240108)
+	(generator "pcbnew")
+	(generator_version "8.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 1.524 0.7366 180)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "caa00779-510c-478a-81dd-515fa355d57c")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "D_Photo"
+		(at 0.216 1.1176 180)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "33f36e84-6676-4da6-a561-5847ce3ff868")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Footprint" "export:TEMD7100"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "B.Fab")
+		(hide yes)
+		(uuid "12e4caba-6316-4fa4-a6b3-7084bf3eaad6")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify mirror)
+		)
+	)
+	(property "Datasheet" "https://dammedia.osram.info/media/resource/hires/osram-dam-8964853/SFH%202703_EN.pdf"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "B.Fab")
+		(hide yes)
+		(uuid "4f2c8716-92c0-4819-b3a6-43509b99a244")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify mirror)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "B.Fab")
+		(hide yes)
+		(uuid "6e2300b8-bc1d-44dc-a44a-a08898ec9123")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify mirror)
+		)
+	)
+	(property "MANUFACTURER" "SFH 2703"
+		(at 0 0 180)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "54733eeb-d937-48ca-ae43-b93fb8a19e72")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(fp_rect
+		(start 1 0.625)
+		(end -1 -0.625)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(fill none)
+		(layer "F.SilkS")
+		(uuid "627d974d-86a4-4905-9067-26bbc946d6ec")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 0 180)
+		(layer "F.Fab")
+		(uuid "d65425c8-8b7c-41f9-a29f-31b8119068d5")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(pad "1" smd roundrect
+		(at -0.8 0 180)
+		(size 1 1.45)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.1)
+		(uuid "3e7111c1-36ce-4ae5-986f-d1c9b6a9b458")
+	)
+	(pad "2" smd roundrect
+		(at 0.8 0 180)
+		(size 1 1.45)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.1)
+		(uuid "16c83c8d-298b-4b1a-922a-e0b43078817c")
+	)
+	(model "D:/Robert/PCB's/Libraries/Footprints_PCB/packages3d/export/TEMD7100.wrl"
+		(opacity 0.9000)
+		(offset
+			(xyz -1 -0.65 0)
+		)
+		(scale
+			(xyz 0.4 0.4 0.4)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

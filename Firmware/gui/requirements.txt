@@ -1,0 +1,7 @@
+PySide6>=6.5
+pyqtgraph>=0.13
+pyserial>=3.5
+numpy>=1.24
+# Optional: Li-Control feature (LI-COR LI-6800 SSH integration)
+paramiko>=3.4
+zeroconf>=0.131

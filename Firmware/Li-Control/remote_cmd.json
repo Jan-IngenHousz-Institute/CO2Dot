@@ -1,0 +1,12 @@
+{
+  "action": "measure",
+  "co2_r": 200,
+  "tair": 20,
+  "rh_air": 45,
+  "wait_for_co2": true,
+  "co2_tol": 5,
+  "wait_s": 1,
+  "qin": 0,
+  "log": true,
+  "cmd_id": "d4b8e8b0-c17a-4ad5-9cb0-41df405444cc"
+}

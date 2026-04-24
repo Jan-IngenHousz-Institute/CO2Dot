@@ -1,0 +1,158 @@
+(footprint "SFH2703"
+	(version 20240108)
+	(generator "pcbnew")
+	(generator_version "8.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at -1.37 1.47 90)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "2a3eb1fd-5f7e-414c-b694-243f680c664a")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "D_Photo"
+		(at 0.19 1.47 180)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "b21cde9f-dea2-455c-b838-cc616dc3de47")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Footprint" "export:SFH2703"
+		(at 0 0 180)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "ada02464-8f67-448a-a6dc-8d57c618e435")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 180)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "4751d1a5-8e77-4b7c-9376-0290a95d1346")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 180)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "d002905c-05d1-4859-b68d-0e592763b45c")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "MANUFACTURER" "SFH 2703"
+		(at 0 0 180)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "754ead0f-953a-40c3-82bd-e07dbc10fd11")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(fp_rect
+		(start -1.57 -1.02)
+		(end 1.57 1.02)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(fill none)
+		(layer "F.SilkS")
+		(uuid "4b8fa655-5f09-47ca-9067-690a470a44e4")
+	)
+	(fp_line
+		(start 1.41 -0.88)
+		(end -1.4 0.52)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "Dwgs.User")
+		(uuid "8100cc12-0a2d-45aa-825e-369c3be5ec13")
+	)
+	(fp_line
+		(start -1.4 -0.88)
+		(end 1.41 0.52)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "Dwgs.User")
+		(uuid "45fb8d6b-8bc6-4f14-b0fa-093ba59d9f79")
+	)
+	(fp_rect
+		(start -1.4 -0.88)
+		(end 1.41 0.52)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(fill none)
+		(layer "Dwgs.User")
+		(uuid "a0d6fb85-d1f9-44d8-87f0-ef1bab26c314")
+	)
+	(fp_rect
+		(start -1.6 -1.03)
+		(end 1.6 1.03)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(fill none)
+		(layer "F.CrtYd")
+		(uuid "551ca3f8-636d-4ba6-bd5f-a4bd790ce543")
+	)
+	(pad "1" smd roundrect
+		(at -1.25 0)
+		(size 0.5 1.9)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+		(uuid "934f20d0-60a8-46c3-87de-b391fc0ba647")
+	)
+	(pad "2" smd roundrect
+		(at 1.25 0)
+		(size 0.5 1.9)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(roundrect_rratio 0.25)
+		(uuid "e8e7664a-0e18-4f1d-8759-018b25acb739")
+	)
+	(model "D:/Robert/PCB's/Libraries/Footprints_PCB/packages3d/SFH_2703.STEP"
+		(opacity 0.9200)
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 0.9 0.9 0.9)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)
