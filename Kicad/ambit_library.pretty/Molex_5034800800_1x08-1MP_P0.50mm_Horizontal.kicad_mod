@@ -1,0 +1,319 @@
+(footprint "Molex_5034800800_1x08-1MP_P0.50mm_Horizontal"
+	(version 20240108)
+	(generator "pcbnew")
+	(generator_version "8.0")
+	(layer "F.Cu")
+	(descr "Hirose FH12, FFC/FPC connector, FH12-8S-0.5SH, 8 Pins per row (https://www.hirose.com/product/en/products/FH12/FH12-24S-0.5SH(55)/), generated with kicad-footprint-generator")
+	(tags "connector Hirose FH12 horizontal")
+	(property "Reference" "REF**"
+		(at -2.555 -1.76 -90)
+		(layer "F.SilkS")
+		(uuid "92ed94d9-3613-430e-bb9c-dba70bee3d12")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "Conn_01x08"
+		(at 0 5.6 180)
+		(layer "F.Fab")
+		(uuid "30cff6fa-8a76-43a1-b2b1-6f7bf0542eda")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Footprint" "Connector_FFC-FPC:Molex_5034800800_1x08-1MP_P0.50mm_Horizontal"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "7a5745b8-996e-45b6-a5e0-a8f8c079b633")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "568db626-ab5a-46ee-be76-e0f9d577fbdc")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "ee98682c-bae1-44b3-8473-e903715bbf95")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr smd)
+	(fp_line
+		(start -2.85 -1.3)
+		(end -2.85 2.3)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "555e0cfc-b590-413b-963c-71b70a34f71c")
+	)
+	(fp_line
+		(start -2.85 2.3)
+		(end 2.85 2.3)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "27eb6e8d-c850-40b9-b489-ab95a6bc6ee3")
+	)
+	(fp_line
+		(start -2.16 -1.3)
+		(end -2.85 -1.3)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "f4770da2-721c-42d2-999b-28e7709b1d42")
+	)
+	(fp_line
+		(start -2.16 -0.55)
+		(end -2.16 -1.75)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "9a094a9d-ba7b-4d8c-ba4d-4e7ee5710c88")
+	)
+	(fp_line
+		(start 2.16 -1.3)
+		(end 2.85 -1.3)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "6af9ea2d-cc0d-4ad9-bc34-799a61d0b7c4")
+	)
+	(fp_line
+		(start 2.85 -1.3)
+		(end 2.85 2.3)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "fe42a276-eb34-4846-881f-ee2ee24be90f")
+	)
+	(fp_line
+		(start -3.05 -1.95)
+		(end -3.05 3.3)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "c8439acb-5e61-4666-9fca-dd519a69afe5")
+	)
+	(fp_line
+		(start -3.05 3.3)
+		(end 3.05 3.3)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "4de7ac33-74f5-45a3-9e98-71e3f1fac94b")
+	)
+	(fp_line
+		(start 3.05 -1.95)
+		(end -3.05 -1.95)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "6fee8088-d491-43a5-a397-b636b2d4a010")
+	)
+	(fp_line
+		(start 3.05 3.3)
+		(end 3.05 -1.95)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "dbcc57e1-c69f-45cd-bca1-38224eaf9823")
+	)
+	(fp_line
+		(start -2.85 -1.2)
+		(end -2.85 2.3)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "88267b97-b52a-453a-a1cb-95c4688b225a")
+	)
+	(fp_line
+		(start -2.25 -1.2)
+		(end -1.75 -0.492893)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "74e38eae-47f5-4d45-87ae-c560713ef511")
+	)
+	(fp_line
+		(start -1.75 -0.492893)
+		(end -1.25 -1.2)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "96ff2f1b-c2b6-4493-868a-410acc3f7e79")
+	)
+	(fp_line
+		(start 0 -1.2)
+		(end -2.85 -1.2)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "464fcad4-231d-4cc4-a632-286331e47b28")
+	)
+	(fp_line
+		(start 0 -1.2)
+		(end 2.85 -1.2)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "55d537d5-ba99-49e9-828d-55edd158ef61")
+	)
+	(fp_line
+		(start 2.85 -1.2)
+		(end 2.85 2.3)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "a4a75f6e-6e6d-44eb-93cb-7f3e24dff3c3")
+	)
+	(fp_line
+		(start 2.85 2.3)
+		(end -2.85 2.3)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "42fb2840-b621-4aca-be74-48c316a18e7f")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 0.5 180)
+		(layer "F.Fab")
+		(uuid "c5f45f2b-7033-43f2-8d89-848243bb0dc6")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(pad "1" smd rect
+		(at -1.75 -1.15)
+		(size 0.3 1.3)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "239cdf88-a284-483a-94b2-481c5225bd2f")
+	)
+	(pad "2" smd rect
+		(at -1.25 -1.15)
+		(size 0.3 1.3)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "30805cad-cc7b-442a-8229-b229082ca16a")
+	)
+	(pad "3" smd rect
+		(at -0.75 -1.15)
+		(size 0.3 1.3)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "63c6f832-c877-4b60-a222-fdd24c5dc92f")
+	)
+	(pad "4" smd rect
+		(at -0.25 -1.15)
+		(size 0.3 1.3)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "9626b2e3-fb11-4482-aad3-cad122d95454")
+	)
+	(pad "5" smd rect
+		(at 0.25 -1.15)
+		(size 0.3 1.3)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "3d00e413-5337-45de-be11-29af21b2f9db")
+	)
+	(pad "6" smd rect
+		(at 0.75 -1.15)
+		(size 0.3 1.3)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "cb8fbca7-a94d-4e8f-a7f6-1317d41dd45d")
+	)
+	(pad "7" smd rect
+		(at 1.25 -1.15)
+		(size 0.3 1.3)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "71bfacca-d09c-4f55-8a48-0cbb8cd06890")
+	)
+	(pad "8" smd rect
+		(at 1.75 -1.15)
+		(size 0.3 1.3)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "8980ef2b-77bd-481c-ad8d-d74a331642da")
+	)
+	(pad "MP" smd rect
+		(at -2.54 2.2)
+		(size 0.3 2)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "1ddddb73-2b46-40f7-93e9-48d5fe6111c3")
+	)
+	(pad "MP" smd rect
+		(at 2.54 2.2)
+		(size 0.3 2)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "4b9f029f-19a2-4150-b298-a3f719711477")
+	)
+	(model "${KICAD6_3DMODEL_DIR}/Connector_FFC-FPC.3dshapes/Hirose_FH12-8S-0.5SH_1x08-1MP_P0.50mm_Horizontal.wrl"
+		(offset
+			(xyz 0 -0.5 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

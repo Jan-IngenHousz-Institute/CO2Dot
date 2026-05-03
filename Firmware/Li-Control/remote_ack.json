@@ -1,0 +1,27 @@
+{
+  "ts": 1772195911.4391341,
+  "cmd_id": "5ddaef19-15df-47a0-b596-b0b8de4259f1",
+  "cmd": {
+    "action": "measure",
+    "co2_r": 250,
+    "tair": 20,
+    "rh_air": 45,
+    "wait_for_co2": true,
+    "co2_tol": 5,
+    "wait_s": 1,
+    "qin": 0,
+    "log": true,
+    "cmd_id": "5ddaef19-15df-47a0-b596-b0b8de4259f1"
+  },
+  "meas": {
+    "CO2_r": 253.22,
+    "CO2_s": 272.135,
+    "H2O_r": 10.3715,
+    "H2O_s": 10.4143,
+    "Tchamber": 19.9814,
+    "Tleaf": 19.4908,
+    "RHcham": 45.01995908791703,
+    "PPFD_in": 0
+  },
+  "error": null
+}

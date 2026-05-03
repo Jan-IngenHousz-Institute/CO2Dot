@@ -1,0 +1,169 @@
+(footprint "MLX90632"
+	(version 20240108)
+	(generator "pcbnew")
+	(generator_version "8.0")
+	(layer "F.Cu")
+	(descr "Temperature Sensor Digital, Infrared (IR) -20°C ~ 85°C 5-SFN (3x3)")
+	(tags "Temperature Sensor Digital, Infrared (IR)")
+	(property "Reference" "REF**"
+		(at -1.855 -1.28 90)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "0ff604c5-dcc7-4455-9272-4383a9935f9b")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "MLX90632"
+		(at 0.045 -1.78 180)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "b4efb72c-2146-4aed-9e0b-0113414de69b")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Footprint" "export:MLX90632"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "B.Fab")
+		(hide yes)
+		(uuid "befb80e5-80b0-4371-933c-b754aa8c9912")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify mirror)
+		)
+	)
+	(property "Datasheet" "https://www.melexis.com/-/media/files/documents/datasheets/mlx90632-datasheet-melexis.pdf"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "B.Fab")
+		(hide yes)
+		(uuid "b687ab22-052c-4331-b7d5-83243d25a72e")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify mirror)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "B.Fab")
+		(hide yes)
+		(uuid "2e0d25b3-edf6-49dd-bf44-6f5ea73fcdd5")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify mirror)
+		)
+	)
+	(attr through_hole)
+	(fp_line
+		(start 1.5 1.5)
+		(end 1.5 -1.5)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "09f3717f-b783-4ec4-a056-1390f7c4747a")
+	)
+	(fp_line
+		(start 1.5 -1.5)
+		(end -1.5 -1.5)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "10ef5868-a145-4811-9548-50a7a52e02ac")
+	)
+	(fp_line
+		(start 1.26 1.5)
+		(end 1.5 1.5)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "2146ea26-b6d6-4536-962a-c2f4fadea652")
+	)
+	(fp_line
+		(start -1.26 1.5)
+		(end -1.5 1.5)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "4bfdb2b9-5aa9-4ac7-92e5-dcf37d17d8e9")
+	)
+	(fp_line
+		(start -1.5 -1.5)
+		(end -1.5 1.5)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "f6205be4-0bad-4321-8dd2-a774cd73d5b0")
+	)
+	(pad "1" smd rect
+		(at -1 1.3 180)
+		(size 0.3 0.6)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "d23632df-90bd-4384-bd4e-b5f36d7b46fe")
+	)
+	(pad "2" smd rect
+		(at -0.5 1.3 180)
+		(size 0.3 0.6)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "4565b8dd-b086-4d5f-b2bc-06a3248ea7c1")
+	)
+	(pad "3" smd rect
+		(at 0 -0.25 180)
+		(size 2.5 2.1)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "104707ee-90dd-459a-bbb7-68bb27dde8bf")
+	)
+	(pad "3" smd rect
+		(at 0 1.3 180)
+		(size 0.3 0.6)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "6dbad3c1-8012-4222-b273-67bdce05fd1c")
+	)
+	(pad "4" smd rect
+		(at 0.5 1.3 180)
+		(size 0.3 0.6)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "21a5c9ba-c237-4d39-bc0d-e312b22c7aa5")
+	)
+	(pad "5" smd rect
+		(at 1 1.3 180)
+		(size 0.3 0.6)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "4bdfcb21-a946-4cc3-b6bc-ac9d42bc8f23")
+	)
+	(model "D:/Robert/PCB's/Libraries/Footprints_PCB/packages3d/MLX90632.wrl"
+		(offset
+			(xyz 0 0.2 0.15)
+		)
+		(scale
+			(xyz 0.015 0.015 0.015)
+		)
+		(rotate
+			(xyz 90 0 0)
+		)
+	)
+)

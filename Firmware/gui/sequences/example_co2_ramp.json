@@ -1,0 +1,44 @@
+{
+  "name": "co2_ramp_example",
+  "steps": [
+    {
+      "name": "baseline",
+      "setpoints": {
+        "co2_r": 400,
+        "tair": 25,
+        "rh_air": 60,
+        "qin": 500,
+        "wait_for_co2": true,
+        "co2_tol": 2,
+        "wait_s": 30,
+        "log": true
+      },
+      "ack_timeout_s": 600
+    },
+    {
+      "name": "step_800",
+      "setpoints": {
+        "co2_r": 800,
+        "wait_for_co2": true,
+        "co2_tol": 3
+      },
+      "ack_timeout_s": 900
+    },
+    {
+      "name": "step_1200",
+      "setpoints": {
+        "co2_r": 1200,
+        "wait_for_co2": true,
+        "co2_tol": 5
+      },
+      "ack_timeout_s": 900
+    },
+    {
+      "name": "recover_baseline",
+      "setpoints": {
+        "co2_r": 400,
+        "wait_s": 60
+      }
+    }
+  ]
+}

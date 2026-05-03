@@ -1,0 +1,253 @@
+(footprint "WLCSP-4-X1--4_0.8x0.8mm_P0.4mm"
+	(version 20240108)
+	(generator "pcbnew")
+	(generator_version "8.0")
+	(layer "F.Cu")
+	(descr "X1-WLB0909, 0.8x0.8mm, 4 Ball, 2x2 Layout, 0.4mm Pitch,BGA")
+	(tags "CSP 4 0.4 BGA")
+	(property "Reference" "REF**"
+		(at 0.39 -0.945 180)
+		(layer "F.SilkS")
+		(uuid "c5911706-23b3-42ba-9667-fb8cf43222b0")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "Si8824EDB"
+		(at -0.06 1.1 180)
+		(layer "F.Fab")
+		(uuid "4dd9415b-e4eb-472d-b1e1-155ba221a1ed")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Footprint" "export:WLCSP-4-X1--4_0.8x0.8mm_P0.4mm"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "14fda780-11a8-450e-952d-11e29a3ce933")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Datasheet" "https://www.vishay.com/docs/62978/si8824edb.pdf"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "d224fc16-0d46-4cd1-84a7-40631ff08ecc")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" "N-MOSFET transistor, drain/source/gate"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "0df789c2-52a8-4360-bff0-abc15f6241dd")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Sim.Device" "NMOS"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "59903e90-3f86-4ced-bff3-a40143113b3d")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Sim.Type" "VDMOS"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "e25fdf5c-97e6-4445-b087-dcb20a7bd505")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Sim.Pins" "1=D 2=G 3=S"
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "cbadf1a5-12cd-49f9-9101-cc1be9184e9e")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(fp_line
+		(start -0.5 0.5)
+		(end -0.5 -0.33)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "a8c4ddc8-1e84-49e1-9e66-32d834e4c61a")
+	)
+	(fp_line
+		(start -0.33 -0.5)
+		(end 0.5 -0.5)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "17f46c20-d710-483e-9a48-45c7cfa39c4e")
+	)
+	(fp_line
+		(start 0.5 -0.5)
+		(end 0.5 0.5)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "1dc06533-3b4c-473b-8d86-10e22aebcd00")
+	)
+	(fp_line
+		(start 0.5 0.5)
+		(end -0.5 0.5)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "afbe8804-452b-4a03-b67b-71ee652a7d79")
+	)
+	(fp_rect
+		(start -0.8 -0.8)
+		(end 0.8 0.8)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill none)
+		(layer "F.CrtYd")
+		(uuid "e3c6ff9e-bf93-4d84-861e-a60171479d15")
+	)
+	(fp_line
+		(start -0.385 -0.23)
+		(end -0.23 -0.385)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "251f4b97-7be8-4d6c-b79f-9a75b5dc5148")
+	)
+	(fp_line
+		(start -0.385 0.385)
+		(end -0.385 -0.23)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "7e676a32-2850-4511-9974-88db578c0e53")
+	)
+	(fp_line
+		(start -0.23 -0.385)
+		(end 0.385 -0.385)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "5ce392cc-349e-45b6-a9ba-dbe8672936bc")
+	)
+	(fp_line
+		(start 0.385 -0.385)
+		(end 0.385 0.385)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "1dc0ccd3-9ca7-49bd-8f5f-0f7233f2a0c8")
+	)
+	(fp_line
+		(start 0.385 0.385)
+		(end -0.385 0.385)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "adabdd9a-0cec-4ae8-b721-77767579299d")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 0 180)
+		(layer "F.Fab")
+		(uuid "a20545de-49e9-4d36-a48d-03225c882311")
+		(effects
+			(font
+				(size 0.4 0.4)
+				(thickness 0.1)
+			)
+		)
+	)
+	(pad "1" smd circle
+		(at -0.2 -0.2)
+		(size 0.215 0.215)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "3d2023ab-f489-47e9-9fdc-6824001e2a18")
+	)
+	(pad "2" smd circle
+		(at 0.2 -0.2)
+		(size 0.215 0.215)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "a7fabb41-de1e-4e76-bd74-54ea675c6a82")
+	)
+	(pad "3" smd circle
+		(at 0.2 0.2)
+		(size 0.215 0.215)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "c3e22baa-5591-40f2-981f-39309f3b01b9")
+	)
+	(pad "4" smd circle
+		(at -0.2 0.2)
+		(size 0.215 0.215)
+		(layers "F.Cu" "F.Paste" "F.Mask")
+		(uuid "4238cacb-4e10-4357-ab66-955984361833")
+	)
+	(model "D:/Robert/PCB's/Libraries/Footprints_PCB/packages3d/export/ADP172.step"
+		(offset
+			(xyz -0.45 0.44 0)
+		)
+		(scale
+			(xyz 0.9 0.9 0.9)
+		)
+		(rotate
+			(xyz 0 0 90)
+		)
+	)
+)
