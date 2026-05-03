@@ -90,7 +90,19 @@ static bool HandleJson(const char *json, size_t len) {
       if (!proto.isNull()) processProtocolSet(proto);
     }
   } else if (doc.is<JsonObject>()) {
-    JsonArray proto = doc.as<JsonObject>()["_protocol_set_"].as<JsonArray>();
+    JsonObject root = doc.as<JsonObject>();
+    // Walk "sample" array → each protocol → "_protocol_set_"
+    JsonArray sample = root["sample"].as<JsonArray>();
+    if (!sample.isNull()) {
+      for (JsonVariant sv : sample) {
+        JsonObject proto = sv.as<JsonObject>();
+        if (proto.isNull()) continue;
+        JsonArray pset = proto["_protocol_set_"].as<JsonArray>();
+        if (!pset.isNull()) processProtocolSet(pset);
+      }
+    }
+    // Legacy: top-level "_protocol_set_"
+    JsonArray proto = root["_protocol_set_"].as<JsonArray>();
     if (!proto.isNull()) processProtocolSet(proto);
   }
 

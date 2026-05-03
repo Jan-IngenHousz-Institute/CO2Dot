@@ -19,3 +19,5 @@ build.log
 # Data files (uncomment to ignore)
 # Firmware/gui/data/
 
+.*
+
