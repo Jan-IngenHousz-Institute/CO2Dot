@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# PlatformIO
+.pio/
+build.log
+
+# IDE / editor
+.vscode/
+.claude/
+
+# KiCad
+*-backups/
+*.kicad_prl
+
+# Data files (uncomment to ignore)
+# Firmware/gui/data/
+
+.*
+!.gitignore
+
+open-jii/
+
+Lib/
