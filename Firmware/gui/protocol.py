@@ -143,10 +143,12 @@ def classify_line(line: str) -> tuple[str, object]:
     'led_set', 'error', 'unknown'.
     """
     stripped = line.strip()
-    if "Hello CO2 meter ready" in stripped:
-        return ("hello", stripped)
 
+    # Hello detection — accept any known device
     obj = _try_parse(stripped)
+    if obj is not None and "device" in obj:
+        return ("hello", obj)
+
     if obj is None:
         return ("unknown", stripped)
 

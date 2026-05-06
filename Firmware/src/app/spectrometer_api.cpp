@@ -14,6 +14,22 @@ bool spectrometer_available = false;
 SpectrometerModel spectrometer_model = SpectrometerModel::None;
 static uint16_t s_led_current_ma = 0;  // tracks last-set LED current
 
+// Per-channel PAR conversion coefficients, indexed 0..channel_count-1.
+// Default values for AS7341 from datasheet.
+float par_coefficients[18] = {
+  1.0f/55.0f,   // F1
+  1.0f/110.0f,  // F2
+  1.0f/210.0f,  // F3
+  1.0f/390.0f,  // F4
+  1.0f/590.0f,  // F5
+  1.0f/840.0f,  // F6
+  1.0f/1350.0f, // F7
+  1.0f/1070.0f, // F8
+  1.0f/1750.0f, // clear
+  1.0f/112.0f,  // nir
+  0,0,0,0,0,0,0,0
+};
+
 // ---------------------------------------------------------------------------
 // Board-level LED policy
 // ---------------------------------------------------------------------------
@@ -45,6 +61,29 @@ static const char * const kAs7343ChannelNames[13] = {
   "f8_745",   // F8  745nm
   "nir_855",  // NIR 855nm
   "clear",    // VIS broadband (avg of 6 VIS readings)
+};
+
+// AS7343 bringup names — 18 entries matching Adafruit as7343_channel_t DATA register order.
+// Used when channel_count == 18 (raw dump mode).
+static const char * const kAs7343BringupNames[18] = {
+  "fz_450",    // DATA[0]  FZ  450nm
+  "fy_555",    // DATA[1]  FY  555nm
+  "fxl_600",   // DATA[2]  FXL 600nm
+  "nir",       // DATA[3]  NIR 855nm
+  "vis_tl_0",  // DATA[4]  VIS clear cycle 1 top-left
+  "vis_br_0",  // DATA[5]  VIS clear cycle 1 both-right
+  "f2_425",    // DATA[6]  F2  425nm
+  "f3_475",    // DATA[7]  F3  475nm
+  "f4_515",    // DATA[8]  F4  515nm
+  "f6_640",    // DATA[9]  F6  640nm
+  "vis_tl_1",  // DATA[10] VIS clear cycle 2 top-left
+  "vis_br_1",  // DATA[11] VIS clear cycle 2 both-right
+  "f1_405",    // DATA[12] F1  405nm
+  "f7_690",    // DATA[13] F7  690nm
+  "f8_745",    // DATA[14] F8  745nm
+  "f5_550",    // DATA[15] F5  550nm
+  "vis_tl_2",  // DATA[16] VIS clear cycle 3 top-left
+  "vis_br_2",  // DATA[17] VIS clear cycle 3 both-right
 };
 
 // Nominal peak wavelengths per channel (nm). 0 = non-spectral (clear), skipped
@@ -294,6 +333,9 @@ const char * const *resolveChannelNames(const SpectrometerResult &r, bool *use_i
   if (r.model == SpectrometerModel::AS7343 && r.channel_count == 13) {
     return kAs7343ChannelNames;
   }
+  if (r.model == SpectrometerModel::AS7343 && r.channel_count == 18) {
+    return kAs7343BringupNames;
+  }
   // Unexpected channel count — fall back to indexed names
   *use_index_names = true;
   return nullptr;
@@ -393,7 +435,7 @@ bool spectrometerPrepareLegacyCommand() {
 // Public API — spectrometer commands
 // ---------------------------------------------------------------------------
 
-bool spectrometer_read() {
+bool spectrometer_read_raw() {
   if (!spectrometerPrepareLegacyCommand()) return false;
 
   SpectrometerResult result;
@@ -406,6 +448,41 @@ bool spectrometer_read() {
   Serial.print(F("{\"spectrometer\":"));
   printChannelsObject(result);
   Serial.print(F("}"));
+  cmdEndLine();
+  return true;
+}
+
+bool spectrometer_read() {
+  if (!spectrometerPrepareLegacyCommand()) return false;
+
+  SpectrometerResult result;
+  if (!spectrometerReadInto(&result)) {
+    Serial.print(F("{\"spectrometer\":{\"error\":\"read_failed\"}}"));
+    cmdEndLine();
+    return false;
+  }
+
+  // Apply per-channel sensitivity correction
+  bool use_index_names = false;
+  const char * const *names = resolveChannelNames(result, &use_index_names);
+
+  Serial.print(F("{\"spectrometer\":{\"model\":\""));
+  Serial.print(spectrometerModelName(result.model));
+  Serial.print(F("\",\"channels\":{"));
+  for (uint8_t i = 0; i < result.channel_count; i++) {
+    if (i > 0) Serial.print(',');
+    Serial.print('"');
+    if (use_index_names) {
+      Serial.print('d');
+      Serial.print(i);
+    } else {
+      Serial.print(names[i]);
+    }
+    Serial.print(F("\":"));
+    float corrected = (float)result.channels[i] * par_coefficients[i];
+    Serial.print(corrected, 4);
+  }
+  Serial.print(F("}}}"));
   cmdEndLine();
   return true;
 }
@@ -433,62 +510,72 @@ bool spectrometer_set_led_current(uint16_t led_current_ma) {
   return true;
 }
 
-bool spectrometer_read_flash(uint16_t led_current_ma) {
+bool spectrometer_read_flash(uint16_t led_current_ma, uint16_t repeat) {
   if (!spectrometerPrepareLegacyCommand()) return false;
 
   // Silent clamp to board maximum
   if (led_current_ma > kSpectrometerLedBoardMaxMa) {
     led_current_ma = kSpectrometerLedBoardMaxMa;
   }
+  if (repeat < 1) repeat = 1;
 
   // Dark read
-  SpectrometerResult dark, lit;
+  SpectrometerResult dark;
   if (!spectrometerReadInto(&dark)) {
     Serial.print(F("{\"spectrometer\":{\"error\":\"dark_read_failed\"}}"));
     cmdEndLine();
     return false;
   }
 
-  // Enable LED and wait for settling
-  const uint16_t actual_led_ma = spectrometerSetLedCurrentSilent(led_current_ma);
-  if (actual_led_ma == kLedSetFailed) {
-    Serial.print(F("{\"spectrometer\":{\"error\":\"led_set_failed\"}}"));
-    cmdEndLine();
-    return false;
-  }
+  // Output each measurement (envelope handles array wrapping)
+  for (uint16_t r = 0; r < repeat; r++) {
+    if (r > 0) Serial.print(',');
 
-  // LED thermal settling: 50 ms minimum before starting the lit integration
-  delay(50);
+    // Enable LED and wait for settling
+    const uint16_t actual_led_ma = spectrometerSetLedCurrentSilent(led_current_ma);
+    if (actual_led_ma == kLedSetFailed) {
+      Serial.print(F("{\"spectrometer\":{\"error\":\"led_set_failed\"}}"));
+      cmdEndLine();
+      return false;
+    }
 
-  // Lit read
-  if (!spectrometerReadInto(&lit)) {
+    // LED thermal settling: 50 ms minimum before starting the lit integration
+    delay(50);
+
+    // Lit read
+    SpectrometerResult lit;
+    if (!spectrometerReadInto(&lit)) {
+      spectrometerSetLedCurrentSilent(0);
+      Serial.print(F("{\"spectrometer\":{\"error\":\"lit_read_failed\"}}"));
+      cmdEndLine();
+      return false;
+    }
+
+    // Disable LED
     spectrometerSetLedCurrentSilent(0);
-    Serial.print(F("{\"spectrometer\":{\"error\":\"lit_read_failed\"}}"));
-    cmdEndLine();
-    return false;
+
+    // Compute diff per channel
+    SpectrometerResult diff;
+    diff.model         = dark.model;
+    diff.channel_count = dark.channel_count;
+    diff.sat_mask      = dark.sat_mask | lit.sat_mask;
+    for (uint8_t i = 0; i < dark.channel_count; i++) {
+      diff.channels[i] =
+          lit.channels[i] > dark.channels[i] ? lit.channels[i] - dark.channels[i] : 0;
+    }
+
+    // Single combined JSON object
+    Serial.print(F("{\"spectrometer_dark\":"));
+    printChannelsObject(dark);
+    Serial.print(F(",\"spectrometer_lit\":"));
+    printChannelsObject(lit);
+    Serial.print(F(",\"spectrometer_diff\":"));
+    printChannelsObject(diff);
+    Serial.print(F("}"));
+
+    delay(1000); // TODO, pass as arg
   }
 
-  // Disable LED
-  spectrometerSetLedCurrentSilent(0);
-
-  // Compute diff per channel
-  SpectrometerResult diff;
-  diff.model         = dark.model;
-  diff.channel_count = dark.channel_count;
-  diff.sat_mask      = dark.sat_mask | lit.sat_mask;
-  for (uint8_t i = 0; i < dark.channel_count; i++) {
-    diff.channels[i] =
-        lit.channels[i] > dark.channels[i] ? lit.channels[i] - dark.channels[i] : 0;
-  }
-
-  // Single combined JSON object
-  Serial.print(F("{\"spectrometer_dark\":"));
-  printChannelsObject(dark);
-  Serial.print(F(",\"spectrometer_lit\":"));
-  printChannelsObject(lit);
-  Serial.print(F(",\"spectrometer_diff\":"));
-  printChannelsObject(diff);
-  Serial.print(F("}"));
   cmdEndLine();
   return true;
 }

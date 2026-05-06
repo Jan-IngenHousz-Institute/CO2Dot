@@ -9,7 +9,7 @@ bool jsonOutputMode = false;
 
 void handleCommandText(const String &cmd) {
   if (cmd == "hello") {
-    Serial.print(F("{\"hello\":\"ready\"}"));
+    Serial.print(F("{\"device\":\"CO2Dot\",\"version\":\"1.0\"}"));
     cmdEndLine();
 
   } else if (cmd == "env") {
@@ -17,6 +17,9 @@ void handleCommandText(const String &cmd) {
 
   } else if (cmd == "i2c_scan") {
     i2c_scan();
+
+  } else if (cmd == "spec_raw") {
+    spectrometer_read_raw();
 
   } else if (cmd == "spec") {
     spectrometer_read();
@@ -51,13 +54,21 @@ void handleCommandText(const String &cmd) {
 
   } else if (cmd.startsWith("spec_flash")) {
     int ledCurrent = 10;
+    int repeat = 1;
     int comma = cmd.indexOf(',');
     if (comma > 0) {
-      String arg = cmd.substring(comma + 1);
-      arg.trim();
-      ledCurrent = arg.toInt();
+      String rest = cmd.substring(comma + 1);
+      rest.trim();
+      int comma2 = rest.indexOf(',');
+      if (comma2 > 0) {
+        ledCurrent = rest.substring(0, comma2).toInt();
+        repeat = rest.substring(comma2 + 1).toInt();
+        if (repeat < 1) repeat = 1;
+      } else {
+        ledCurrent = rest.toInt();
+      }
     }
-    spectrometer_read_flash(static_cast<uint16_t>(ledCurrent));
+    spectrometer_read_flash(static_cast<uint16_t>(ledCurrent), static_cast<uint16_t>(repeat));
 
   } else if (cmd.startsWith("spec_set_atime")) {
     int comma = cmd.indexOf(',');

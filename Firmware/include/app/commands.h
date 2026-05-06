@@ -6,9 +6,7 @@
 // can be concatenated inside the openJII JSON envelope.
 extern bool jsonOutputMode;
 
-// Prints '\n' only when jsonOutputMode is false.
-// Every command handler should call this instead of Serial.println() at the
-// end of its output.
-inline void cmdEndLine() { if (!jsonOutputMode) Serial.println(); }
+// No-op: JSON responses no longer append trailing newlines.
+inline void cmdEndLine() { }
 
 void handleCommandText(const String &cmd);
