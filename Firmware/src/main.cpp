@@ -40,8 +40,8 @@ static void serialJsonInit() {
 }
 
 static void serialJsonEnd() {
-  Serial.print(F("]}]}"));
-  Serial.println();
+  Serial.print(F("]}]}7A1E3AA1"));
+  Serial.print('\n');
 }
 
 // ── HandleJson ─────────────────────────────────────────────────────────
@@ -55,12 +55,13 @@ static bool HandleJson(const char *json, size_t len) {
   if (err) {
     Serial.print(F("{\"error\":\"json_parse\",\"detail\":\""));
     Serial.print(err.c_str());
-    Serial.println(F("\"}"));
+    Serial.print(F("\"}\n"));
     return false;
   }
 
   serialJsonInit();
   bool firstOut = true;
+  bool handledAny = false;
   jsonOutputMode = true;
 
   auto processProtocolSet = [&](JsonArray proto) {
@@ -74,36 +75,39 @@ static bool HandleJson(const char *json, size_t len) {
       uint16_t repeats = setObj["protocol_repeats"] | 1;
       if (repeats == 0) repeats = 1;
 
+      if (!firstOut) Serial.print(',');
+      firstOut = false;
+      // Always wrap in a JSON array so set[N] is consistently a list for macros
+      Serial.print('[');
       for (uint16_t i = 0; i < repeats; i++) {
-        if (!firstOut) Serial.print(',');
-        firstOut = false;
+        if (i > 0) Serial.print(',');
         handleCommandText(String(label));
       }
+      Serial.print(']');
+      handledAny = true;
     }
   };
 
   if (doc.is<JsonArray>()) {
-    for (JsonVariant v : doc.as<JsonArray>()) {
+    JsonArray arr = doc.as<JsonArray>();
+    // Try: array of objects each containing a "set" key
+    for (JsonVariant v : arr) {
       JsonObject obj = v.as<JsonObject>();
       if (obj.isNull()) continue;
-      JsonArray proto = obj["_protocol_set_"].as<JsonArray>();
+      JsonArray proto = obj["set"].as<JsonArray>();
       if (!proto.isNull()) processProtocolSet(proto);
     }
+    // Fallback: treat the array itself as the command list
+    if (!handledAny) processProtocolSet(arr);
   } else if (doc.is<JsonObject>()) {
-    JsonObject root = doc.as<JsonObject>();
-    // Walk "sample" array → each protocol → "_protocol_set_"
-    JsonArray sample = root["sample"].as<JsonArray>();
-    if (!sample.isNull()) {
-      for (JsonVariant sv : sample) {
-        JsonObject proto = sv.as<JsonObject>();
-        if (proto.isNull()) continue;
-        JsonArray pset = proto["_protocol_set_"].as<JsonArray>();
-        if (!pset.isNull()) processProtocolSet(pset);
+    // Iterate all members; process first array value as the command list
+    for (JsonPair kv : doc.as<JsonObject>()) {
+      JsonArray proto = kv.value().as<JsonArray>();
+      if (!proto.isNull()) {
+        processProtocolSet(proto);
+        break;
       }
     }
-    // Legacy: top-level "_protocol_set_"
-    JsonArray proto = root["_protocol_set_"].as<JsonArray>();
-    if (!proto.isNull()) processProtocolSet(proto);
   }
 
   serialJsonEnd();
@@ -115,6 +119,10 @@ static bool HandleJson(const char *json, size_t len) {
 
 void setup() {
   Serial.begin(115200);
+#if ARDUINO_USB_CDC_ON_BOOT
+  delay(2000);  // give USB CDC time to enumerate on host
+#endif
+  // Serial.println(F("{\"boot\":\"starting\"}"));
   Wire.begin(3, 4);
 
   bme_available = initBME();
@@ -126,13 +134,14 @@ void setup() {
   #endif
 
   initSpectrometer();
+  // Serial.println(F("{\"boot\":\"ready\"}"));
 }
 
 void loop() {
   // Timeout: reset if we're mid‑JSON and no byte arrives within the window.
   if (rxMode == RxMode::JSON && rxLen > 0
       && (millis() - lastCharMs) > kJsonTimeoutMs) {
-    Serial.println(F("{\"error\":\"json_timeout\"}"));
+    Serial.print(F("{\"error\":\"json_timeout\"}\n"));
     resetRx();
   }
 
@@ -144,7 +153,7 @@ void loop() {
 
     // ── overflow guard (all modes) ──
     if (rxLen >= sizeof(rxBuf) - 1) {
-      Serial.println(F("{\"error\":\"rx_overflow\"}"));
+      Serial.print(F("{\"error\":\"rx_overflow\"}\n"));
       resetRx();
       continue;
     }
@@ -166,8 +175,10 @@ void loop() {
         rxBuf[rxLen] = '\0';
         String cmd(rxBuf);
         cmd.trim();
-        if (cmd.length() > 0)
+        if (cmd.length() > 0) {
           handleCommandText(cmd);
+          Serial.print('\n');  // terminate response so serial parsers can delimit
+        }
         resetRx();
       }
       continue;

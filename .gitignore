@@ -20,4 +20,8 @@ build.log
 # Firmware/gui/data/
 
 .*
+!.gitignore
 
+open-jii/
+
+Lib/

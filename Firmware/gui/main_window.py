@@ -104,7 +104,7 @@ class TimeAxisItem(pg.AxisItem):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("CO2Dot Controller")
+        self.setWindowTitle("CO2Dot / MiniPAR Controller")
         self.resize(1280, 800)
 
         # State
@@ -130,6 +130,8 @@ class MainWindow(QMainWindow):
         self._led = 10
         self._auto_range = True
         self._show_timestamp = False
+        self._device_type = ""        # "CO2Dot" or "MiniPAR"
+        self._has_bme = False         # True only for devices with BME sensor
 
         # Li-Control state (all lazily created)
         self._base_dir = base_dir
@@ -505,11 +507,14 @@ class MainWindow(QMainWindow):
             if not port or port.startswith("("):
                 return
             self._status_bar.showMessage(f"Checking {port}…")
-            if not device_manager.check_port(port):
+            detected = device_manager.check_port(port)
+            if not detected:
                 self._status_bar.showMessage(
-                    f"{port}: no CO2Dot device found (no hello response)"
+                    f"{port}: no known device found (no hello response)"
                 )
                 return
+            self._device_type = detected
+            self._has_bme = (detected == "CO2Dot")
             if self._worker is not None:
                 self._worker.deleteLater()
             self._worker = SerialWorker(self)
@@ -528,10 +533,18 @@ class MainWindow(QMainWindow):
     # Worker signal handlers
     # ------------------------------------------------------------------
 
-    def _on_connected(self, port: str):
-        self._status_bar.showMessage(f"Connected: {port}")
+    def _on_connected(self, info: dict):
+        port = info.get("port", "")
+        device = info.get("device", "")
+        if device:
+            self._device_type = device
+            self._has_bme = (device == "CO2Dot")
+        self._status_bar.showMessage(f"Connected: {port} ({device or 'unknown'})")
         self._start_btn.setEnabled(True)
         self._apply_btn.setEnabled(True)
+        # Hide/show BME UI based on device capabilities
+        self._bme_plot.setVisible(self._has_bme)
+        self._bme_status_lbl.setVisible(self._has_bme)
 
     def _on_disconnected(self):
         self._running = False
@@ -542,6 +555,10 @@ class MainWindow(QMainWindow):
         self._connect_btn.setText("Connect")
         self._spec_status_lbl.setText("Spectrometer: —")
         self._bme_status_lbl.setText("BME: —")
+        self._bme_status_lbl.setVisible(True)
+        self._bme_plot.setVisible(True)
+        self._device_type = ""
+        self._has_bme = False
         self._status_bar.showMessage("Disconnected")
         if self._recorder.is_recording:
             self._recorder.stop_recording()
@@ -575,12 +592,20 @@ class MainWindow(QMainWindow):
                     break
 
         if bme_info:
+            self._has_bme = True
             avail = bme_info.get("available", False)
             icon  = "✓" if avail else "✗"
             color = "green" if avail else "red"
             self._bme_status_lbl.setText(
                 f'<span style="color:{color}">{icon} BME68x</span>'
             )
+            self._bme_plot.setVisible(True)
+            self._bme_status_lbl.setVisible(True)
+        elif not self._has_bme:
+            # Device doesn't report BME — hide related UI
+            self._bme_status_lbl.setText("BME: N/A")
+            self._bme_plot.setVisible(False)
+            self._bme_status_lbl.setVisible(False)
 
     def _on_spec(self, data: dict):
         self._acq_pending = False
@@ -625,8 +650,9 @@ class MainWindow(QMainWindow):
         if self._acq_pending:
             return  # previous cycle still in progress
         self._acq_pending = True
-        # Send env first so BME data arrives before spec (fixes data alignment)
-        self._worker.send_command(protocol.CMD_ENV)
+        # Send env only if the device has a BME sensor
+        if self._has_bme:
+            self._worker.send_command(protocol.CMD_ENV)
         if self._mode_flash.isChecked():
             self._worker.send_command(protocol.cmd_spec_flash(self._led_spin.value()))
         else:

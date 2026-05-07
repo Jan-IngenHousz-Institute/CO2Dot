@@ -26,7 +26,7 @@ class SerialWorker(QThread):
     status_received  = Signal(dict)   # {"spectrometer": {...}, "bme": {...}}
     spec_config_received = Signal(dict)  # {"atime": int, "astep": int, "gain": int}
     error_received   = Signal(str)    # human-readable error string
-    connected        = Signal(str)    # port name when hello confirmed
+    connected        = Signal(dict)   # {"port": str, "device": str} when hello confirmed
     disconnected     = Signal()
 
     def __init__(self, parent=None):
@@ -121,7 +121,10 @@ class SerialWorker(QThread):
             if kind == "hello":
                 if not hello_confirmed:
                     hello_confirmed = True
-                    self.connected.emit(self._port)
+                    device_name = ""
+                    if isinstance(parsed, dict):
+                        device_name = parsed.get("device", "")
+                    self.connected.emit({"port": self._port, "device": device_name})
                     # Request initial status
                     self._queue.put(CMD_STATUS)
 

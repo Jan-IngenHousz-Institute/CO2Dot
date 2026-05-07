@@ -8,12 +8,15 @@
 extern bool spectrometer_available;
 extern SpectrometerModel spectrometer_model;
 
+extern float par_coefficients[18];
+
 const char *spectrometerModelName(SpectrometerModel model);
 bool initSpectrometer();
 bool spectrometerPrepareLegacyCommand();
+bool spectrometer_read_raw();
 bool spectrometer_read();
 bool spectrometer_set_led_current(uint16_t led_current_ma);
-bool spectrometer_read_flash(uint16_t led_current_ma);
+bool spectrometer_read_flash(uint16_t led_current_ma, uint16_t repeat = 1);
 bool spectrometer_read_flash_wave(uint16_t led_current_ma, uint16_t wavelength_nm);
 void spectrometerPrintNotAvailableError();
 void spectrometerPrintUnsupportedDeviceError();
