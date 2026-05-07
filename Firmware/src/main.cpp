@@ -119,7 +119,9 @@ static bool HandleJson(const char *json, size_t len) {
 
 void setup() {
   Serial.begin(115200);
+#if ARDUINO_USB_CDC_ON_BOOT
   delay(2000);  // give USB CDC time to enumerate on host
+#endif
   // Serial.println(F("{\"boot\":\"starting\"}"));
   Wire.begin(3, 4);
 
