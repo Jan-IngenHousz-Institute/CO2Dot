@@ -118,9 +118,17 @@ static bool HandleJson(const char *json, size_t len) {
 // ── setup / loop ───────────────────────────────────────────────────────
 
 void setup() {
-  Serial.begin(115200);
 #if ARDUINO_USB_CDC_ON_BOOT
+  // usb env: native USB-CDC on the C3's USB peripheral (GPIO18/19 driven by
+  // the USB block, not the UART). Default Serial.begin is correct.
+  Serial.begin(115200);
   delay(2000);  // give USB CDC time to enumerate on host
+#else
+  // uart env: USB peripheral is off, so remap Serial's UART RX/TX onto the
+  // very GPIOs the USB-C connector is wired to (D- = GPIO18, D+ = GPIO19).
+  // Lets the USB-C connector carry TTL-UART straight through to a passive
+  // USB → FFC adapter for the ambyte.
+  Serial.begin(115200, SERIAL_8N1, /*rx=*/18, /*tx=*/19);
 #endif
   // Serial.println(F("{\"boot\":\"starting\"}"));
   Wire.begin(3, 4);

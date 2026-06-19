@@ -563,7 +563,7 @@
       "plot": "gerbers/",
       "pos_files": "",
       "specctra_dsn": "",
-      "step": "BME280+MLX90632_Ribbon+extension-thin version.step",
+      "step": "CO2Dot.step",
       "svg": "",
       "vmrl": "",
       "vrml": ""

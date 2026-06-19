@@ -16,6 +16,9 @@ build.log
 *-backups/
 *.kicad_prl
 
+# CAD
+*.FCBak
+
 # Data files (uncomment to ignore)
 # Firmware/gui/data/
 
@@ -25,3 +28,7 @@ build.log
 open-jii/
 
 Lib/
+
+# data
+Scripts/Li-Control/co2dot_data/
+Scripts/Li-Control/old

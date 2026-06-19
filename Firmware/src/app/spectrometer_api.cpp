@@ -5,6 +5,7 @@
 #include "app/as7341_api.h"
 #include "app/as7343_api.h"
 #include "app/commands.h"
+#include "app/response.h"
 #include "app/spectrometer_api.h"
 
 // ---------------------------------------------------------------------------
@@ -341,28 +342,28 @@ const char * const *resolveChannelNames(const SpectrometerResult &r, bool *use_i
   return nullptr;
 }
 
-// Prints {"model":"...","channels":{...}} — the inner object used by both the
-// single-read and the flash-read (dark/lit/diff) output paths.
-void printChannelsObject(const SpectrometerResult &r) {
+// Fills channel key:value pairs directly into `out`. corrected=true applies the
+// per-channel PAR coefficients (4-decimal floats); corrected=false emits raw
+// counts. No "model"/"channels" wrapper — a building block for the helpers below.
+void fill_channels_into(JsonObject out, const SpectrometerResult &r, bool corrected) {
   bool use_index_names = false;
   const char * const *names = resolveChannelNames(r, &use_index_names);
-
-  Serial.print(F("{\"model\":\""));
-  Serial.print(spectrometerModelName(r.model));
-  Serial.print(F("\",\"channels\":{"));
   for (uint8_t i = 0; i < r.channel_count; i++) {
-    if (i > 0) Serial.print(',');
-    Serial.print('"');
-    if (use_index_names) {
-      Serial.print('d');
-      Serial.print(i);
+    if (corrected) {
+      const float v = (float)r.channels[i] * par_coefficients[i];
+      if (use_index_names) out[String("d") + i] = serialized(String(v, 4));
+      else                 out[names[i]]        = serialized(String(v, 4));
     } else {
-      Serial.print(names[i]);
+      if (use_index_names) out[String("d") + i] = r.channels[i];
+      else                 out[names[i]]        = r.channels[i];
     }
-    Serial.print(F("\":"));
-    Serial.print(r.channels[i]);
   }
-  Serial.print(F("}}"));
+}
+
+// Fills out with command-as-root {"model":...,"channels":{...}} for spec reads.
+void fill_spec_result(JsonObject out, const SpectrometerResult &r, bool corrected) {
+  out["model"] = spectrometerModelName(r.model);
+  fill_channels_into(out["channels"].to<JsonObject>(), r, corrected);
 }
 
 } // namespace
@@ -406,26 +407,18 @@ bool initSpectrometer() {
   return initialized;
 }
 
-void spectrometerPrintNotAvailableError() {
-  Serial.print(F("{\"spectrometer\":{\"error\":\"not_available\"}}"));
-  cmdEndLine();
-}
-
-void spectrometerPrintUnsupportedDeviceError() {
-  Serial.print(F("{\"spectrometer\":{\"error\":\"unsupported_device_at_0x39\"}}"));
-  cmdEndLine();
-}
-
-bool spectrometerPrepareLegacyCommand() {
+// Verifies the spectrometer is ready. On failure, writes an "error" field into
+// `doc` (command-as-root) and returns false; the caller respond()s and returns.
+bool spectrometerPrepareLegacyCommand(JsonDocument &doc) {
   if (spectrometer_model == SpectrometerModel::ProbePendingAt0x39) {
     detectAndInitialize(true, "legacy_cmd_retry");
   }
   if (spectrometer_model == SpectrometerModel::UnknownAt0x39) {
-    spectrometerPrintUnsupportedDeviceError();
+    doc["error"] = "unsupported_device_at_0x39";
     return false;
   }
   if (!spectrometer_available) {
-    spectrometerPrintNotAvailableError();
+    doc["error"] = "not_available";
     return false;
   }
   return true;
@@ -436,59 +429,40 @@ bool spectrometerPrepareLegacyCommand() {
 // ---------------------------------------------------------------------------
 
 bool spectrometer_read_raw() {
-  if (!spectrometerPrepareLegacyCommand()) return false;
+  JsonDocument doc;
+  if (!spectrometerPrepareLegacyCommand(doc)) { respond(doc); return false; }
 
   SpectrometerResult result;
   if (!spectrometerReadInto(&result)) {
-    Serial.print(F("{\"spectrometer\":{\"error\":\"read_failed\"}}"));
-    cmdEndLine();
+    doc["error"] = "read_failed";
+    respond(doc);
     return false;
   }
 
-  Serial.print(F("{\"spectrometer\":"));
-  printChannelsObject(result);
-  Serial.print(F("}"));
-  cmdEndLine();
+  fill_spec_result(doc.to<JsonObject>(), result, /*corrected=*/false);
+  respond(doc);
   return true;
 }
 
 bool spectrometer_read() {
-  if (!spectrometerPrepareLegacyCommand()) return false;
+  JsonDocument doc;
+  if (!spectrometerPrepareLegacyCommand(doc)) { respond(doc); return false; }
 
   SpectrometerResult result;
   if (!spectrometerReadInto(&result)) {
-    Serial.print(F("{\"spectrometer\":{\"error\":\"read_failed\"}}"));
-    cmdEndLine();
+    doc["error"] = "read_failed";
+    respond(doc);
     return false;
   }
 
-  // Apply per-channel sensitivity correction
-  bool use_index_names = false;
-  const char * const *names = resolveChannelNames(result, &use_index_names);
-
-  Serial.print(F("{\"spectrometer\":{\"model\":\""));
-  Serial.print(spectrometerModelName(result.model));
-  Serial.print(F("\",\"channels\":{"));
-  for (uint8_t i = 0; i < result.channel_count; i++) {
-    if (i > 0) Serial.print(',');
-    Serial.print('"');
-    if (use_index_names) {
-      Serial.print('d');
-      Serial.print(i);
-    } else {
-      Serial.print(names[i]);
-    }
-    Serial.print(F("\":"));
-    float corrected = (float)result.channels[i] * par_coefficients[i];
-    Serial.print(corrected, 4);
-  }
-  Serial.print(F("}}}"));
-  cmdEndLine();
+  fill_spec_result(doc.to<JsonObject>(), result, /*corrected=*/true);
+  respond(doc);
   return true;
 }
 
 bool spectrometer_set_led_current(uint16_t led_current_ma) {
-  if (!spectrometerPrepareLegacyCommand()) return false;
+  JsonDocument doc;
+  if (!spectrometerPrepareLegacyCommand(doc)) { respond(doc); return false; }
 
   // Silent clamp to board maximum
   if (led_current_ma > kSpectrometerLedBoardMaxMa) {
@@ -497,21 +471,20 @@ bool spectrometer_set_led_current(uint16_t led_current_ma) {
 
   const uint16_t actual_ma = spectrometerSetLedCurrentSilent(led_current_ma);
   if (actual_ma == kLedSetFailed) {
-    Serial.print(F("{\"spectrometer\":{\"error\":\"led_set_failed\"}}"));
-    cmdEndLine();
+    doc["error"] = "led_set_failed";
+    respond(doc);
     return false;
   }
   s_led_current_ma = actual_ma;
 
-  Serial.print(F("{\"spectrometer\":{\"led_current_ma\":"));
-  Serial.print(actual_ma);
-  Serial.print(F("}}"));
-  cmdEndLine();
+  doc["led_current_ma"] = actual_ma;
+  respond(doc);
   return true;
 }
 
 bool spectrometer_read_flash(uint16_t led_current_ma, uint16_t repeat) {
-  if (!spectrometerPrepareLegacyCommand()) return false;
+  JsonDocument doc;
+  if (!spectrometerPrepareLegacyCommand(doc)) { respond(doc); return false; }
 
   // Silent clamp to board maximum
   if (led_current_ma > kSpectrometerLedBoardMaxMa) {
@@ -519,23 +492,37 @@ bool spectrometer_read_flash(uint16_t led_current_ma, uint16_t repeat) {
   }
   if (repeat < 1) repeat = 1;
 
-  // Dark read
+  // Dark read (shared across all repeats)
   SpectrometerResult dark;
   if (!spectrometerReadInto(&dark)) {
-    Serial.print(F("{\"spectrometer\":{\"error\":\"dark_read_failed\"}}"));
-    cmdEndLine();
+    doc["error"] = "dark_read_failed";
+    respond(doc);
     return false;
   }
 
-  // Output each measurement (envelope handles array wrapping)
-  for (uint16_t r = 0; r < repeat; r++) {
-    if (r > 0) Serial.print(',');
+  // Fills one command-as-root measurement object {model,dark,lit,diff}.
+  auto fillMeasurement = [&](JsonObject obj, const SpectrometerResult &lit) {
+    SpectrometerResult diff;
+    diff.model         = dark.model;
+    diff.channel_count = dark.channel_count;
+    diff.sat_mask      = dark.sat_mask | lit.sat_mask;
+    for (uint8_t i = 0; i < dark.channel_count; i++) {
+      diff.channels[i] =
+          lit.channels[i] > dark.channels[i] ? lit.channels[i] - dark.channels[i] : 0;
+    }
+    obj["model"] = spectrometerModelName(dark.model);
+    fill_channels_into(obj["dark"].to<JsonObject>(), dark, false);
+    fill_channels_into(obj["lit"].to<JsonObject>(), lit, false);
+    fill_channels_into(obj["diff"].to<JsonObject>(), diff, false);
+  };
 
+  for (uint16_t r = 0; r < repeat; r++) {
     // Enable LED and wait for settling
     const uint16_t actual_led_ma = spectrometerSetLedCurrentSilent(led_current_ma);
     if (actual_led_ma == kLedSetFailed) {
-      Serial.print(F("{\"spectrometer\":{\"error\":\"led_set_failed\"}}"));
-      cmdEndLine();
+      doc.clear();
+      doc["error"] = "led_set_failed";
+      respond(doc);
       return false;
     }
 
@@ -546,37 +533,27 @@ bool spectrometer_read_flash(uint16_t led_current_ma, uint16_t repeat) {
     SpectrometerResult lit;
     if (!spectrometerReadInto(&lit)) {
       spectrometerSetLedCurrentSilent(0);
-      Serial.print(F("{\"spectrometer\":{\"error\":\"lit_read_failed\"}}"));
-      cmdEndLine();
+      doc.clear();
+      doc["error"] = "lit_read_failed";
+      respond(doc);
       return false;
     }
 
     // Disable LED
     spectrometerSetLedCurrentSilent(0);
 
-    // Compute diff per channel
-    SpectrometerResult diff;
-    diff.model         = dark.model;
-    diff.channel_count = dark.channel_count;
-    diff.sat_mask      = dark.sat_mask | lit.sat_mask;
-    for (uint8_t i = 0; i < dark.channel_count; i++) {
-      diff.channels[i] =
-          lit.channels[i] > dark.channels[i] ? lit.channels[i] - dark.channels[i] : 0;
+    // repeat==1 → single object root; repeat>1 → array of measurement objects
+    if (repeat == 1) {
+      fillMeasurement(doc.to<JsonObject>(), lit);
+    } else {
+      if (!doc.is<JsonArray>()) doc.to<JsonArray>();
+      fillMeasurement(doc.as<JsonArray>().add<JsonObject>(), lit);
     }
 
-    // Single combined JSON object
-    Serial.print(F("{\"spectrometer_dark\":"));
-    printChannelsObject(dark);
-    Serial.print(F(",\"spectrometer_lit\":"));
-    printChannelsObject(lit);
-    Serial.print(F(",\"spectrometer_diff\":"));
-    printChannelsObject(diff);
-    Serial.print(F("}"));
-
-    delay(1000); // TODO, pass as arg
+    if (r + 1 < repeat) delay(1000); // TODO, pass as arg
   }
 
-  cmdEndLine();
+  respond(doc);
   return true;
 }
 
@@ -586,7 +563,8 @@ bool spectrometer_read_flash(uint16_t led_current_ma, uint16_t repeat) {
 // (6CH / 12CH / 18CH) and on AS7341 runs a single SMUX pass instead of two.
 // Cuts LED-on time by 2-3x for cycle-1 channels.
 bool spectrometer_read_flash_wave(uint16_t led_current_ma, uint16_t wavelength_nm) {
-  if (!spectrometerPrepareLegacyCommand()) return false;
+  JsonDocument doc;
+  if (!spectrometerPrepareLegacyCommand(doc)) { respond(doc); return false; }
 
   if (led_current_ma > kSpectrometerLedBoardMaxMa) {
     led_current_ma = kSpectrometerLedBoardMaxMa;
@@ -596,23 +574,23 @@ bool spectrometer_read_flash_wave(uint16_t led_current_ma, uint16_t wavelength_n
   uint16_t actual_nm = 0;
   if (!resolveWavelengthChannel(spectrometer_model, wavelength_nm,
                                 &ch_index, &actual_nm)) {
-    Serial.print(F("{\"spectrometer_flash_wave\":{\"error\":\"wavelength_unavailable\"}}"));
-    cmdEndLine();
+    doc["error"] = "wavelength_unavailable";
+    respond(doc);
     return false;
   }
 
   uint16_t dark_v   = 0;
   uint16_t dark_sat = 0;
   if (!spectrometerReadChannelFast(ch_index, &dark_v, &dark_sat)) {
-    Serial.print(F("{\"spectrometer_flash_wave\":{\"error\":\"dark_read_failed\"}}"));
-    cmdEndLine();
+    doc["error"] = "dark_read_failed";
+    respond(doc);
     return false;
   }
 
   const uint16_t actual_led_ma = spectrometerSetLedCurrentSilent(led_current_ma);
   if (actual_led_ma == kLedSetFailed) {
-    Serial.print(F("{\"spectrometer_flash_wave\":{\"error\":\"led_set_failed\"}}"));
-    cmdEndLine();
+    doc["error"] = "led_set_failed";
+    respond(doc);
     return false;
   }
 
@@ -623,8 +601,8 @@ bool spectrometer_read_flash_wave(uint16_t led_current_ma, uint16_t wavelength_n
   uint16_t lit_sat = 0;
   if (!spectrometerReadChannelFast(ch_index, &lit_v, &lit_sat)) {
     spectrometerSetLedCurrentSilent(0);
-    Serial.print(F("{\"spectrometer_flash_wave\":{\"error\":\"lit_read_failed\"}}"));
-    cmdEndLine();
+    doc["error"] = "lit_read_failed";
+    respond(doc);
     return false;
   }
 
@@ -641,29 +619,17 @@ bool spectrometer_read_flash_wave(uint16_t led_current_ma, uint16_t wavelength_n
   bool use_index_names = false;
   const char * const *names = resolveChannelNames(probe, &use_index_names);
 
-  Serial.print(F("{\"spectrometer_flash_wave\":{\"model\":\""));
-  Serial.print(spectrometerModelName(spectrometer_model));
-  Serial.print(F("\",\"wavelength\":"));
-  Serial.print(actual_nm);
-  Serial.print(F(",\"channel\":\""));
-  if (use_index_names) {
-    Serial.print('d');
-    Serial.print(ch_index);
-  } else {
-    Serial.print(names[ch_index]);
-  }
-  Serial.print(F("\",\"dark\":"));
-  Serial.print(dark_v);
-  Serial.print(F(",\"lit\":"));
-  Serial.print(lit_v);
-  Serial.print(F(",\"diff\":"));
-  Serial.print(diff_v);
-  Serial.print(F(",\"sat\":"));
-  Serial.print(sat);
-  Serial.print(F(",\"led_ma\":"));
-  Serial.print(actual_led_ma);
-  Serial.print(F("}}"));
-  cmdEndLine();
+  JsonObject out = doc.to<JsonObject>();
+  out["model"]      = spectrometerModelName(spectrometer_model);
+  out["wavelength"] = actual_nm;
+  if (use_index_names) out["channel"] = String("d") + ch_index;
+  else                 out["channel"] = names[ch_index];
+  out["dark"]   = dark_v;
+  out["lit"]    = lit_v;
+  out["diff"]   = diff_v;
+  out["sat"]    = sat;
+  out["led_ma"] = actual_led_ma;
+  respond(doc);
   return true;
 }
 
@@ -685,11 +651,9 @@ void fill_spectrometer_status(JsonObject out) {
 }
 
 void cmd_spectrometer_status() {
-  StaticJsonDocument<256> doc;
-  JsonObject obj = doc["spectrometer_status"].to<JsonObject>();
-  fill_spectrometer_status(obj);
-  serializeJson(doc, Serial);
-  cmdEndLine();
+  JsonDocument doc;
+  fill_spectrometer_status(doc.to<JsonObject>());
+  respond(doc);
 }
 
 // ---------------------------------------------------------------------------
@@ -697,84 +661,62 @@ void cmd_spectrometer_status() {
 // Command syntax:  spectrometer_set_atime,<0-255>
 //                  spectrometer_set_astep,<0-65534>
 //                  spectrometer_set_gain,<0-12>   (AS7341 enum ordinal or AS7343 register value)
-// Response: {"spectrometer_config":{"atime":N,"astep":N,"gain":N}} on success
-//           {"spectrometer_config":{"error":"..."}} on failure
+// Response (command-as-root): {"atime":N,"astep":N,"gain":N} on success
+//                             {"error":"..."} on failure
 // ---------------------------------------------------------------------------
 
-static void printConfigResponse() {
-  Serial.print(F("{\"spectrometer_config\":{\"atime\":"));
-  Serial.print(spectrometerGetAtIME());
-  Serial.print(F(",\"astep\":"));
-  Serial.print(spectrometerGetAStep());
-  Serial.print(F(",\"gain\":"));
+static void fillConfig(JsonObject out) {
+  out["atime"] = spectrometerGetAtIME();
+  out["astep"] = spectrometerGetAStep();
   uint8_t gain = 0;
   if (spectrometer_model == SpectrometerModel::AS7341) gain = as7341_getGain();
   else if (spectrometer_model == SpectrometerModel::AS7343) gain = as7343_getGain();
-  Serial.print(gain);
-  Serial.print(F("}}"));
-  cmdEndLine();
+  out["gain"] = gain;
 }
 
 void cmd_spectrometer_set_atime(int argc, const char *argv[]) {
-  if (!spectrometerPrepareLegacyCommand()) return;
-  if (argc < 1) {
-    Serial.print(F("{\"spectrometer_config\":{\"error\":\"missing_arg\"}}"));
-    cmdEndLine();
-    return;
-  }
+  JsonDocument doc;
+  if (!spectrometerPrepareLegacyCommand(doc)) { respond(doc); return; }
+  if (argc < 1) { doc["error"] = "missing_arg"; respond(doc); return; }
   const int val = atoi(argv[0]);
-  if (val < 0 || val > 255) {
-    Serial.print(F("{\"spectrometer_config\":{\"error\":\"atime_out_of_range\"}}"));
-    cmdEndLine();
-    return;
-  }
+  if (val < 0 || val > 255) { doc["error"] = "atime_out_of_range"; respond(doc); return; }
   bool ok = false;
   if (spectrometer_model == SpectrometerModel::AS7341)
     ok = (as7341_setAtIME(static_cast<uint8_t>(val)) == static_cast<uint8_t>(val));
   else if (spectrometer_model == SpectrometerModel::AS7343)
     ok = as7343_setAtIME(static_cast<uint8_t>(val));
-  if (!ok) { Serial.print(F("{\"spectrometer_config\":{\"error\":\"set_failed\"}}")); cmdEndLine(); return; }
-  printConfigResponse();
+  if (!ok) { doc["error"] = "set_failed"; respond(doc); return; }
+  fillConfig(doc.to<JsonObject>());
+  respond(doc);
 }
 
 void cmd_spectrometer_set_astep(int argc, const char *argv[]) {
-  if (!spectrometerPrepareLegacyCommand()) return;
-  if (argc < 1) {
-    Serial.print(F("{\"spectrometer_config\":{\"error\":\"missing_arg\"}}"));
-    cmdEndLine();
-    return;
-  }
+  JsonDocument doc;
+  if (!spectrometerPrepareLegacyCommand(doc)) { respond(doc); return; }
+  if (argc < 1) { doc["error"] = "missing_arg"; respond(doc); return; }
   const long val = atol(argv[0]);
-  if (val < 0 || val > 65534) {
-    Serial.print(F("{\"spectrometer_config\":{\"error\":\"astep_out_of_range\"}}"));
-    cmdEndLine();
-    return;
-  }
+  if (val < 0 || val > 65534) { doc["error"] = "astep_out_of_range"; respond(doc); return; }
   bool ok = false;
   if (spectrometer_model == SpectrometerModel::AS7341)
     ok = (as7341_setAStep(static_cast<uint16_t>(val)) == static_cast<uint16_t>(val));
   else if (spectrometer_model == SpectrometerModel::AS7343)
     ok = as7343_setAStep(static_cast<uint16_t>(val));
-  if (!ok) { Serial.print(F("{\"spectrometer_config\":{\"error\":\"set_failed\"}}")); cmdEndLine(); return; }
-  printConfigResponse();
+  if (!ok) { doc["error"] = "set_failed"; respond(doc); return; }
+  fillConfig(doc.to<JsonObject>());
+  respond(doc);
 }
 
 void cmd_spectrometer_set_gain(int argc, const char *argv[]) {
-  if (!spectrometerPrepareLegacyCommand()) return;
-  if (argc < 1) {
-    Serial.print(F("{\"spectrometer_config\":{\"error\":\"missing_arg\"}}"));
-    cmdEndLine();
-    return;
-  }
+  JsonDocument doc;
+  if (!spectrometerPrepareLegacyCommand(doc)) { respond(doc); return; }
+  if (argc < 1) { doc["error"] = "missing_arg"; respond(doc); return; }
   const int val = atoi(argv[0]);
   // AS7341 gain enum: 0=0.5x, 1=1x, 2=2x, ..., 10=512x (10 max)
   // AS7343 gain register: 0=0.5x, 1=1x, ..., 12=2048x (12 max)
   const int max_gain = (spectrometer_model == SpectrometerModel::AS7341) ? 10 : 12;
   if (val < 0 || val > max_gain) {
-    Serial.print(F("{\"spectrometer_config\":{\"error\":\"gain_out_of_range_0_\""));
-    Serial.print(max_gain);
-    Serial.print(F("\"}}"));
-    cmdEndLine();
+    doc["error"] = String("gain_out_of_range_0_") + max_gain;
+    respond(doc);
     return;
   }
   bool ok = false;
@@ -782,6 +724,7 @@ void cmd_spectrometer_set_gain(int argc, const char *argv[]) {
     ok = as7341_setGain(static_cast<as7341_gain_t>(val));
   else if (spectrometer_model == SpectrometerModel::AS7343)
     ok = as7343_setGain(static_cast<uint8_t>(val));
-  if (!ok) { Serial.print(F("{\"spectrometer_config\":{\"error\":\"set_failed\"}}")); cmdEndLine(); return; }
-  printConfigResponse();
+  if (!ok) { doc["error"] = "set_failed"; respond(doc); return; }
+  fillConfig(doc.to<JsonObject>());
+  respond(doc);
 }

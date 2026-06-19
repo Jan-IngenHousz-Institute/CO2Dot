@@ -12,14 +12,13 @@ extern float par_coefficients[18];
 
 const char *spectrometerModelName(SpectrometerModel model);
 bool initSpectrometer();
-bool spectrometerPrepareLegacyCommand();
+// On failure, writes an "error" field into `doc` and returns false.
+bool spectrometerPrepareLegacyCommand(JsonDocument &doc);
 bool spectrometer_read_raw();
 bool spectrometer_read();
 bool spectrometer_set_led_current(uint16_t led_current_ma);
 bool spectrometer_read_flash(uint16_t led_current_ma, uint16_t repeat = 1);
 bool spectrometer_read_flash_wave(uint16_t led_current_ma, uint16_t wavelength_nm);
-void spectrometerPrintNotAvailableError();
-void spectrometerPrintUnsupportedDeviceError();
 // Fill an existing JsonObject with the spectrometer status fields (no print).
 // Used by cmd_spectrometer_status() and by the combined "status" command.
 void fill_spectrometer_status(JsonObject out);

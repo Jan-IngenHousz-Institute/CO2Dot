@@ -1,0 +1,8 @@
+# Dependencies for the LI-6800 control modules.
+# li_connect.py  (SSH + file-protocol bridge)  -> paramiko
+# li_mqtt.py     (native MQTT control)          -> paho-mqtt
+# co2dot.py      (CO2Dot USB serial client)     -> pyserial
+# Everything else used is the Python standard library.
+paramiko>=3.0
+paho-mqtt>=1.6
+pyserial>=3.5
