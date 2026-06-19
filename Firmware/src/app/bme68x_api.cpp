@@ -3,36 +3,29 @@
 #include <bme68xLibrary.h>
 #include "app/bme68x_api.h"
 #include "app/commands.h"
+#include "app/response.h"
 
 
 
 static constexpr uint8_t BME68X_ADDR = 0x76; // common: 0x76 or 0x77
 Bme68x bme;
 
-static void printBMEJson(const bme68xData &d)
+// Fills out with the BME reading {T,P,RH,Gas}. Floats use serialized() so the
+// emitted precision is fixed (matching the historical 2/3-decimal output).
+static void fill_bme_values(JsonObject out, const bme68xData &d)
 {
 #ifdef BME68X_USE_FPU
-  Serial.print(F("{\"T\":"));
-  Serial.print(d.temperature, 2);
-  Serial.print(F(",\"P\":"));
-  Serial.print(d.pressure / 100.0f, 2);
-  Serial.print(F(",\"RH\":"));
-  Serial.print(d.humidity, 2);
-  Serial.print(F(",\"Gas\":"));
-  Serial.print(d.gas_resistance, 0);
-  Serial.print('}');
+  out["T"]   = serialized(String(d.temperature, 2));
+  out["P"]   = serialized(String(d.pressure / 100.0f, 2));
+  out["RH"]  = serialized(String(d.humidity, 2));
+  out["Gas"] = (uint32_t)d.gas_resistance;
 #else
   // Bosch fixed-point defaults:
   // temperature: °C * 100, humidity: %RH * 1000, pressure: Pa, gas_resistance: Ω
-  Serial.print(F("{\"T\":"));
-  Serial.print(d.temperature / 100.0f, 2);
-  Serial.print(F(",\"P\":"));
-  Serial.print(d.pressure / 100.0f, 2);
-  Serial.print(F(",\"RH\":"));
-  Serial.print(d.humidity / 1000.0f, 3);
-  Serial.print(F(",\"Gas\":"));
-  Serial.print(d.gas_resistance);
-  Serial.print('}');
+  out["T"]   = serialized(String(d.temperature / 100.0f, 2));
+  out["P"]   = serialized(String(d.pressure / 100.0f, 2));
+  out["RH"]  = serialized(String(d.humidity / 1000.0f, 3));
+  out["Gas"] = (uint32_t)d.gas_resistance;
 #endif
 }
 
@@ -53,9 +46,10 @@ bool initBME(void) {
 
 
 void cmd_bme_read(){
+    JsonDocument doc;
     if (!bme_available) {
-      Serial.print(F("{\"bme_read\":{\"error\":\"not_available\"}}"));
-      cmdEndLine();
+      doc["error"] = "not_available";
+      respond(doc);
       return;
     }
     bme.setOpMode(BME68X_FORCED_MODE);
@@ -63,15 +57,13 @@ void cmd_bme_read(){
     delayMicroseconds(dur_us + 150000); // + heater duration (150ms)
     uint8_t n = bme.fetchData();
     if (bme.checkStatus() != 0 || n == 0) {
-      Serial.print(F("{\"bme_read\":{\"error\":\"read_failed\"}}"));
-      cmdEndLine();
+      doc["error"] = "read_failed";
+      respond(doc);
       return;
     }
     bme68xData *all = bme.getAllData();
-    Serial.print(F("{\"bme_read\":")); 
-    printBMEJson(all[0]);  // use first (most recent) reading
-    Serial.print('}');
-    cmdEndLine();
+    fill_bme_values(doc.to<JsonObject>(), all[0]);  // first (most recent) reading
+    respond(doc);
 }
 
 void fill_bme_status(JsonObject out) {
@@ -79,9 +71,7 @@ void fill_bme_status(JsonObject out) {
 }
 
 void cmd_bme_status() {
-  StaticJsonDocument<64> doc;
-  JsonObject obj = doc["bme_status"].to<JsonObject>();
-  fill_bme_status(obj);
-  serializeJson(doc, Serial);
-  cmdEndLine();
+  JsonDocument doc;
+  fill_bme_status(doc.to<JsonObject>());
+  respond(doc);
 }

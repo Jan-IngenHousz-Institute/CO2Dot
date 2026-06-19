@@ -1,9 +1,12 @@
 """
-protocol.py — Serial command strings and JSON response parsers for CO2Dot.
+protocol.py — Serial command strings and response parsers for CO2Dot.
 
 Serial config: 115200 baud, 8N1, no parity.
 All commands are plain text terminated with '\n'.
-All responses are JSON lines (one JSON object per line).
+Responses follow the command-as-root openJII LINE protocol: one newline-
+terminated payload per command, with no wrapper keys (see
+/CommunicationProtocolOpenJIISerial.md). classify_line() routes each response
+by its top-level shape.
 """
 
 import json
@@ -126,9 +129,9 @@ def defaults_for_model(model: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _try_parse(line: str):
-    """Return parsed JSON object or None."""
+    """Return parsed JSON value (object or array) or None."""
     line = line.strip()
-    if not line.startswith("{"):
+    if not (line.startswith("{") or line.startswith("[")):
         return None
     try:
         return json.loads(line)
@@ -141,64 +144,59 @@ def classify_line(line: str) -> tuple[str, object]:
     Classify an incoming serial line and return (kind, parsed) where kind is
     one of: 'hello', 'status', 'spec', 'spec_flash', 'bme', 'spec_config',
     'led_set', 'error', 'unknown'.
+
+    Responses follow the command-as-root protocol (see
+    /CommunicationProtocolOpenJIISerial.md): there are no wrapper keys, so each
+    kind is detected from its top-level shape.
     """
     stripped = line.strip()
-
-    # Hello detection — accept any known device
     obj = _try_parse(stripped)
-    if obj is not None and "device" in obj:
-        return ("hello", obj)
-
-    if obj is None:
+    if not isinstance(obj, dict):
         return ("unknown", stripped)
 
-    # Status
-    if "spectrometer_status" in obj or "bme_status" in obj:
+    # Error — reserved top-level key (e.g. {"error":"not_available"})
+    if "error" in obj:
+        return ("error", obj.get("error", "error"))
+
+    # Hello — {"device":..,"version":..}
+    if "device" in obj:
+        return ("hello", obj)
+
+    # Combined status — {"spectrometer":{...},"bme":{...}}
+    if "spectrometer" in obj or "bme" in obj:
         result = {}
-        if "spectrometer_status" in obj:
-            result["spectrometer"] = obj["spectrometer_status"]
-        if "bme_status" in obj:
-            result["bme"] = obj["bme_status"]
+        if "spectrometer" in obj:
+            result["spectrometer"] = obj["spectrometer"]
+        if "bme" in obj:
+            result["bme"] = obj["bme"]
         return ("status", result) if result else ("unknown", stripped)
 
-    # Spec flash (check before ambient because both have 'spectrometer' key)
-    if "spectrometer_diff" in obj:
-        diff = obj["spectrometer_diff"]
-        if isinstance(diff, dict) and "channels" in diff and "model" in diff:
-            if "error" not in diff:
-                return ("spec_flash", {"model": diff["model"], "channels": diff["channels"]})
+    # Spec flash — {"model":..,"dark":{...},"lit":{...},"diff":{...}}
+    # (check before ambient: a flash object has no top-level "channels")
+    if "diff" in obj and "model" in obj:
+        diff = obj["diff"]
+        if isinstance(diff, dict):
+            return ("spec_flash", {"model": obj["model"], "channels": diff})
 
-    # Spectrometer responses (ambient read or LED set)
-    if "spectrometer" in obj:
-        spec = obj["spectrometer"]
-        if isinstance(spec, dict):
-            # LED set response
-            if "led_current_ma" in spec:
-                return ("led_set", spec)
-            # Error response
-            if "error" in spec:
-                return ("error", f"spectrometer: {spec['error']}")
-            # Ambient spec read
-            channels = spec.get("channels")
-            model = spec.get("model", "")
-            if isinstance(channels, dict) and model:
-                return ("spec", {"model": model, "channels": channels})
+    # Ambient spec read — {"model":..,"channels":{...}}
+    if "channels" in obj and "model" in obj:
+        channels = obj["channels"]
+        if isinstance(channels, dict):
+            return ("spec", {"model": obj["model"], "channels": channels})
 
-    # BME
-    if "bme_read" in obj:
-        bme = obj["bme_read"]
-        if isinstance(bme, dict) and all(k in bme for k in ("T", "P", "RH", "Gas")):
-            return ("bme", {
-                "T": float(bme["T"]), "P": float(bme["P"]),
-                "RH": float(bme["RH"]), "Gas": int(bme["Gas"]),
-            })
+    # LED set ack — {"led_current_ma":N}
+    if "led_current_ma" in obj:
+        return ("led_set", obj)
 
-    # Config ack
-    if "spectrometer_config" in obj:
-        cfg = obj["spectrometer_config"]
-        if isinstance(cfg, dict):
-            if "error" in cfg:
-                return ("error", f"spectrometer_config: {cfg['error']}")
-            return ("spec_config", cfg)
+    # BME read — {"T":..,"P":..,"RH":..,"Gas":..}
+    if all(k in obj for k in ("T", "P", "RH", "Gas")):
+        return ("bme", {
+            "T": float(obj["T"]), "P": float(obj["P"]),
+            "RH": float(obj["RH"]), "Gas": int(obj["Gas"]),
+        })
+
+    # Config ack — {"atime":..,"astep":..,"gain":..}
+    if all(k in obj for k in ("atime", "astep", "gain")):
+        return ("spec_config", obj)
 
     return ("unknown", stripped)

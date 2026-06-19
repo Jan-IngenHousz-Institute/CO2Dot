@@ -1,0 +1,1 @@
+ssh licor@[fe80::f01c:15ff:feb8:9639%6]

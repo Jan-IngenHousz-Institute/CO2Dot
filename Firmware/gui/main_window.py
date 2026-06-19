@@ -57,6 +57,13 @@ BME_COLORS = {
 
 BME_UNITS = {"T": "°C", "P": "hPa", "RH": "%RH", "Gas": "Ω"}
 
+# Distinct from SPEC_COLORS so the two plots don't collide visually
+PYRO_COLORS = [
+    "#ff6b6b", "#feca57", "#48dbfb", "#1dd1a1", "#ee5a6f", "#c44569",
+    "#5a4f9e", "#f8b500", "#576574", "#10ac84", "#ff9ff3", "#341f97",
+    "#01a3a4", "#ee5a24", "#7bed9f", "#ff7f50",
+]
+
 # Interval dropdown: label → seconds
 INTERVALS = [
     ("1 s",    1),
@@ -146,6 +153,19 @@ class MainWindow(QMainWindow):
         self._gui_cfg = self._load_gui_config()
         self._li_enabled = bool(self._gui_cfg.get("li_control_enabled", False))
 
+        # Pyroscience state (all lazily created)
+        self._pyro_enabled = bool(self._gui_cfg.get("pyroscience_enabled", False))
+        self._pyro_panel = None
+        self._pyro_worker = None
+        self._pyro_plot = None
+        self._pyro_time_axis = None
+        self._pyro_legend = None
+        self._pyro_curves: dict = {}
+        self._pyro_buffer = None
+        self._pyro_recorder = None
+        self._pyro_idnr = ""
+        self._pyro_channel = 1
+
         # Pyqtgraph global style
         pg.setConfigOption("background", "#1e1e2e")
         pg.setConfigOption("foreground", "#cdd6f4")
@@ -197,6 +217,15 @@ class MainWindow(QMainWindow):
                 self._save_gui_config()
                 self._li_toggle_action.setChecked(False)
                 self._status_bar.showMessage(f"Li-Control disabled: {exc}")
+        if self._pyro_enabled:
+            try:
+                self._init_pyroscience()
+            except Exception as exc:
+                self._pyro_enabled = False
+                self._gui_cfg["pyroscience_enabled"] = False
+                self._save_gui_config()
+                self._pyro_toggle_action.setChecked(False)
+                self._status_bar.showMessage(f"Pyroscience disabled: {exc}")
 
     def _build_left_panel(self) -> QWidget:
         panel = QWidget()
@@ -329,6 +358,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._spec_plot)
         splitter.addWidget(self._bme_plot)
         splitter.setSizes([400, 300])
+        self._right_splitter = splitter
 
         # Disable auto-range when user manually zooms/pans
         self._spec_plot.getViewBox().sigRangeChangedManually.connect(
@@ -549,7 +579,8 @@ class MainWindow(QMainWindow):
     def _on_disconnected(self):
         self._running = False
         self._acq_timer.stop()
-        self._start_btn.setEnabled(False)
+        # Re-enable Start only if Pyroscience is still around to drive it
+        self._start_btn.setEnabled(self._has_any_worker())
         self._stop_btn.setEnabled(False)
         self._apply_btn.setEnabled(False)
         self._connect_btn.setText("Connect")
@@ -659,27 +690,51 @@ class MainWindow(QMainWindow):
             self._worker.send_command(protocol.CMD_SPEC)
 
     def _on_start(self):
-        if not self._worker:
+        co2_running = bool(self._worker and self._worker.isRunning())
+        pyro_running = bool(
+            self._pyro_worker and self._pyro_worker.isRunning()
+        )
+        if not (co2_running or pyro_running):
             return
-        interval_ms = INTERVALS[self._interval_combo.currentIndex()][1] * 1000
+
+        if co2_running:
+            interval_ms = INTERVALS[self._interval_combo.currentIndex()][1] * 1000
+            self._acq_timer.start(interval_ms)
+
+        if pyro_running:
+            interval_s = (self._pyro_panel.current_interval_s()
+                          if self._pyro_panel is not None else 1.0)
+            self._pyro_worker.start_streaming(interval_s)
+            if self._pyro_panel is not None:
+                self._pyro_panel.on_streaming_started()
+
         self._running = True
-        self._acq_timer.start(interval_ms)
         self._start_btn.setEnabled(False)
         self._stop_btn.setEnabled(True)
         self._record_btn.setEnabled(True)
         self._status_bar.showMessage("Acquiring…")
-        # Immediate first sample
-        self._on_acquire_tick()
+        if co2_running:
+            # Immediate first CO2Dot sample (Pyro paces itself)
+            self._on_acquire_tick()
 
     def _on_stop(self):
         self._running = False
         self._acq_timer.stop()
-        self._start_btn.setEnabled(True)
+        if self._pyro_worker is not None and self._pyro_worker.isRunning():
+            self._pyro_worker.stop_streaming()
+            if self._pyro_panel is not None:
+                self._pyro_panel.on_streaming_stopped()
+        self._start_btn.setEnabled(self._has_any_worker())
         self._stop_btn.setEnabled(False)
         self._record_btn.setEnabled(False)
         if self._recorder.is_recording:
             self._on_record_stop()
         self._status_bar.showMessage("Stopped")
+
+    def _has_any_worker(self) -> bool:
+        co2 = bool(self._worker and self._worker.isRunning())
+        pyro = bool(self._pyro_worker and self._pyro_worker.isRunning())
+        return co2 or pyro
 
     def _on_clear(self):
         # Clear graph buffers and curves; recording continues to the same file
@@ -697,6 +752,15 @@ class MainWindow(QMainWindow):
         self._bme_legend.clear()
         self._last_spec = None
         self._last_bme = None
+        # Pyroscience (if active)
+        if self._pyro_buffer is not None:
+            self._pyro_buffer.clear()
+        if self._pyro_plot is not None:
+            for curve in self._pyro_curves.values():
+                self._pyro_plot.removeItem(curve)
+            self._pyro_curves.clear()
+            if self._pyro_legend is not None:
+                self._pyro_legend.clear()
 
     # ------------------------------------------------------------------
     # Recording control
@@ -719,8 +783,15 @@ class MainWindow(QMainWindow):
         self._stop_rec_btn.setEnabled(True)
         self._status_bar.showMessage(f"Recording → {path.name}")
 
+        # If Pyroscience is already streaming, start a parallel pyro file.
+        if (self._pyro_worker is not None
+                and self._pyro_worker.isRunning()):
+            self._open_pyro_recorder_lazy()
+
     def _on_record_stop(self):
         self._recorder.stop_recording()
+        if self._pyro_recorder is not None and self._pyro_recorder.is_recording:
+            self._pyro_recorder.stop_recording()
         self._record_btn.setEnabled(self._running)
         self._stop_rec_btn.setEnabled(False)
         self._status_bar.showMessage("Recording stopped")
@@ -758,12 +829,16 @@ class MainWindow(QMainWindow):
         self._spec_plot.enableAutoRange(axis='y')
         for vb in self._bme_vbs.values():
             vb.enableAutoRange(axis='y')
+        if self._pyro_plot is not None:
+            self._pyro_plot.enableAutoRange(axis='y')
 
     def _on_x_fit(self):
         """Auto-fit horizontal axis only (keep vertical range)."""
         self._spec_plot.enableAutoRange(axis='x')
         for vb in self._bme_vbs.values():
             vb.enableAutoRange(axis='x')
+        if self._pyro_plot is not None:
+            self._pyro_plot.enableAutoRange(axis='x')
 
     def _on_reset_view(self):
         """Reset to full auto-scale on both axes, re-enable live auto-range."""
@@ -771,6 +846,8 @@ class MainWindow(QMainWindow):
         self._spec_plot.enableAutoRange()
         for vb in self._bme_vbs.values():
             vb.enableAutoRange()
+        if self._pyro_plot is not None:
+            self._pyro_plot.enableAutoRange()
 
     def _on_toggle_time_axis(self):
         """Toggle x-axis between elapsed seconds and HH:MM:SS."""
@@ -779,15 +856,22 @@ class MainWindow(QMainWindow):
             self._time_toggle_btn.setText("HH:MM:SS")
             self._spec_plot.setLabel("bottom", "Timestamp")
             self._bme_plot.setLabel("bottom", "Timestamp")
+            if self._pyro_plot is not None:
+                self._pyro_plot.setLabel("bottom", "Timestamp")
         else:
             self._time_toggle_btn.setText("Time (s)")
             self._spec_plot.setLabel("bottom", "Time", units="s")
             self._bme_plot.setLabel("bottom", "Time", units="s")
+            if self._pyro_plot is not None:
+                self._pyro_plot.setLabel("bottom", "Time", units="s")
         self._spec_time_axis.set_timestamp_mode(self._show_timestamp)
         self._bme_time_axis.set_timestamp_mode(self._show_timestamp)
+        if self._pyro_time_axis is not None:
+            self._pyro_time_axis.set_timestamp_mode(self._show_timestamp)
         # Force redraw
         self._update_spec_plot()
         self._update_bme_plot()
+        self._update_pyro_plot()
 
     def _on_reset_defaults(self):
         """Reset spectrometer settings to model defaults."""
@@ -898,6 +982,12 @@ class MainWindow(QMainWindow):
         self._li_toggle_action.setChecked(self._li_enabled)
         self._li_toggle_action.toggled.connect(self._toggle_li_control)
         view_menu.addAction(self._li_toggle_action)
+
+        self._pyro_toggle_action = QAction("Enable Pyroscience", self)
+        self._pyro_toggle_action.setCheckable(True)
+        self._pyro_toggle_action.setChecked(self._pyro_enabled)
+        self._pyro_toggle_action.toggled.connect(self._toggle_pyroscience)
+        view_menu.addAction(self._pyro_toggle_action)
 
     def _toggle_li_control(self, enabled: bool) -> None:
         self._li_enabled = enabled
@@ -1203,6 +1293,219 @@ class MainWindow(QMainWindow):
         self._status_bar.showMessage(message)
 
     # ------------------------------------------------------------------
+    # Pyroscience: optional feature
+    # ------------------------------------------------------------------
+
+    def _toggle_pyroscience(self, enabled: bool) -> None:
+        self._pyro_enabled = enabled
+        self._gui_cfg["pyroscience_enabled"] = enabled
+        self._save_gui_config()
+        if enabled:
+            if self._pyro_panel is None:
+                try:
+                    self._init_pyroscience()
+                except Exception as exc:
+                    self._pyro_toggle_action.setChecked(False)
+                    self._status_bar.showMessage(f"Pyroscience init failed: {exc}")
+                    return
+            self._pyro_panel.setVisible(True)
+            if self._pyro_plot is not None:
+                self._pyro_plot.setVisible(True)
+                self._right_splitter.setSizes([320, 240, 240])
+        else:
+            # Disconnect first if a session is live, then hide
+            if self._pyro_worker is not None and self._pyro_worker.isRunning():
+                self._pyro_worker.close_port()
+            if self._pyro_recorder is not None and self._pyro_recorder.is_recording:
+                self._pyro_recorder.stop_recording()
+            if self._pyro_panel is not None:
+                self._pyro_panel.setVisible(False)
+            if self._pyro_plot is not None:
+                self._pyro_plot.setVisible(False)
+                self._right_splitter.setSizes([400, 300, 0])
+
+    def _init_pyroscience(self) -> None:
+        # Lazy imports so a broken install doesn't keep the GUI from launching
+        # when the feature is disabled.
+        from pyro_panel import PyroPanel
+        from pyro_buffer import PyroBuffer
+
+        # Buffer
+        if self._pyro_buffer is None:
+            self._pyro_buffer = PyroBuffer()
+
+        # Plot pane (created once, inserted into the right splitter)
+        if self._pyro_plot is None:
+            self._pyro_time_axis = TimeAxisItem(orientation='bottom')
+            self._pyro_plot = pg.PlotWidget(
+                title="Pyroscience",
+                axisItems={'bottom': self._pyro_time_axis},
+            )
+            self._pyro_plot.setLabel("left", "Value")
+            self._pyro_plot.setLabel(
+                "bottom",
+                "Timestamp" if self._show_timestamp else "Time",
+                units=None if self._show_timestamp else "s",
+            )
+            self._pyro_time_axis.set_timestamp_mode(self._show_timestamp)
+            self._pyro_plot.showGrid(x=True, y=True, alpha=0.3)
+            self._pyro_legend = self._pyro_plot.addLegend(
+                offset=(10, 10), colCount=2
+            )
+            self._pyro_plot.getViewBox().sigRangeChangedManually.connect(
+                self._on_manual_zoom)
+            self._right_splitter.addWidget(self._pyro_plot)
+            self._right_splitter.setSizes([320, 240, 240])
+
+        # Left-panel widget
+        panel = PyroPanel()
+        panel.connect_requested.connect(self._on_pyro_connect)
+        panel.disconnect_requested.connect(self._on_pyro_disconnect)
+        insert_at = self._left_layout.count() - 1   # before trailing addStretch
+        self._left_layout.insertWidget(insert_at, panel)
+        self._pyro_panel = panel
+
+    # ---- Slots --------------------------------------------------------
+
+    def _on_pyro_connect(self, port: str, channel: int, interval_s: float) -> None:
+        if self._pyro_worker is not None and self._pyro_worker.isRunning():
+            return
+        try:
+            from pyro_worker import PyroWorker
+        except ImportError as exc:
+            self._status_bar.showMessage(
+                f"Pyroscience: pyserial missing ({exc})"
+            )
+            return
+
+        self._pyro_channel = int(channel)
+        if self._pyro_worker is None:
+            self._pyro_worker = PyroWorker(self)
+            self._pyro_worker.connected.connect(self._on_pyro_connected)
+            self._pyro_worker.disconnected.connect(self._on_pyro_disconnected)
+            self._pyro_worker.sample_received.connect(self._on_pyro_sample)
+            self._pyro_worker.error_received.connect(self._on_pyro_error)
+        self._pyro_worker.open_port(port, channel, interval_s)
+        self._status_bar.showMessage(f"Pyroscience: connecting to {port}…")
+
+    def _on_pyro_disconnect(self) -> None:
+        if self._pyro_worker is not None and self._pyro_worker.isRunning():
+            self._pyro_worker.close_port()
+
+    def _on_pyro_connected(self, info: dict) -> None:
+        self._pyro_idnr = info.get("idnr", "")
+        if self._pyro_panel is not None:
+            self._pyro_panel.on_connected(info)
+        # Allow the global Start button to drive Pyroscience too
+        if not self._running:
+            self._start_btn.setEnabled(True)
+        else:
+            # Acquisition already in progress — auto-join the running session
+            interval_s = (self._pyro_panel.current_interval_s()
+                          if self._pyro_panel is not None else 1.0)
+            self._pyro_worker.start_streaming(interval_s)
+            if self._pyro_panel is not None:
+                self._pyro_panel.on_streaming_started()
+        self._status_bar.showMessage(
+            f"Pyroscience connected: {info.get('port', '')}"
+        )
+
+    def _on_pyro_disconnected(self) -> None:
+        if self._pyro_panel is not None:
+            self._pyro_panel.on_disconnected()
+        if self._pyro_recorder is not None and self._pyro_recorder.is_recording:
+            self._pyro_recorder.stop_recording()
+        # Disable Start unless CO2Dot is still around to drive it
+        if not self._running:
+            self._start_btn.setEnabled(self._has_any_worker())
+        self._status_bar.showMessage("Pyroscience disconnected")
+
+    def _on_pyro_sample(self, data: dict) -> None:
+        ts = float(data.get("timestamp", time.time()))
+        ch = int(data.get("channel", self._pyro_channel))
+        # Field-only dict for buffer/recorder
+        sample = {k: v for k, v in data.items()
+                  if k not in ("timestamp", "channel")}
+        if self._pyro_buffer is not None:
+            self._pyro_buffer.append(ts, sample)
+        self._update_pyro_plot()
+
+        # Late-Record edge case: open a pyro recorder lazily if the main
+        # recorder is already running and we just got our first sample.
+        if (self._recorder.is_recording
+                and (self._pyro_recorder is None
+                     or not self._pyro_recorder.is_recording)):
+            self._open_pyro_recorder_lazy()
+
+        if (self._pyro_recorder is not None
+                and self._pyro_recorder.is_recording):
+            self._pyro_recorder.write_row(
+                datetime.fromtimestamp(ts).isoformat(timespec="milliseconds"),
+                ch,
+                sample,
+            )
+
+    def _on_pyro_error(self, msg: str) -> None:
+        if self._pyro_panel is not None:
+            self._pyro_panel.on_error(msg)
+        self._status_bar.showMessage(f"Pyroscience: {msg}")
+
+    # ---- Plot update --------------------------------------------------
+
+    def _update_pyro_plot(self) -> None:
+        if (self._pyro_buffer is None
+                or self._pyro_plot is None
+                or len(self._pyro_buffer) == 0):
+            return
+        import pyro_protocol
+
+        times = self._pyro_buffer.times()
+        t0 = times[0]
+        t_rel = times - t0
+        if self._pyro_time_axis is not None:
+            self._pyro_time_axis.set_t0(t0)
+
+        # Materialize curves on first sample
+        if not self._pyro_curves:
+            for i, field in enumerate(pyro_protocol.FIELDS):
+                color = PYRO_COLORS[i % len(PYRO_COLORS)]
+                pen = pg.mkPen(color=color, width=1.5)
+                curve = self._pyro_plot.plot(pen=pen, name=field)
+                self._pyro_curves[field] = curve
+                self._connect_legend_toggle(self._pyro_legend, curve)
+                if field not in pyro_protocol.DEFAULT_VISIBLE:
+                    curve.setVisible(False)
+                    if self._pyro_legend.items:
+                        sample_item, label_item = self._pyro_legend.items[-1]
+                        sample_item.setOpacity(0.3)
+                        label_item.setOpacity(0.3)
+
+        for field, curve in self._pyro_curves.items():
+            vals = self._pyro_buffer.field(field)
+            if len(vals) == len(t_rel):
+                curve.setData(t_rel, vals)
+
+        if self._auto_range:
+            self._pyro_plot.enableAutoRange()
+
+    # ---- Recorder helpers --------------------------------------------
+
+    def _open_pyro_recorder_lazy(self) -> None:
+        from pyro_recorder import PyroRecorder
+        if self._pyro_recorder is None:
+            self._pyro_recorder = PyroRecorder(self._base_dir / "data")
+        try:
+            filename = self._filename_edit.text().strip() or "DATA"
+            path = self._pyro_recorder.start_recording(
+                filename=filename,
+                idnr=self._pyro_idnr,
+                channel=self._pyro_channel,
+            )
+            self._status_bar.showMessage(f"Pyroscience recording → {path.name}")
+        except OSError as exc:
+            self._status_bar.showMessage(f"Pyroscience record failed: {exc}")
+
+    # ------------------------------------------------------------------
     # Close
     # ------------------------------------------------------------------
 
@@ -1226,6 +1529,13 @@ class MainWindow(QMainWindow):
                 pass
         if self._li_recorder is not None and self._li_recorder.is_recording:
             self._li_recorder.stop_recording()
+        if self._pyro_worker is not None and self._pyro_worker.isRunning():
+            try:
+                self._pyro_worker.close_port()
+            except Exception:
+                pass
+        if self._pyro_recorder is not None and self._pyro_recorder.is_recording:
+            self._pyro_recorder.stop_recording()
         if self._worker and self._worker.isRunning():
             self._worker.close_port()
         super().closeEvent(event)

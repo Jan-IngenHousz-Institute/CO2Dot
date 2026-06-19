@@ -6,7 +6,7 @@
 // can be concatenated inside the openJII JSON envelope.
 extern bool jsonOutputMode;
 
-// No-op: JSON responses no longer append trailing newlines.
-inline void cmdEndLine() { }
+// Terminate the current line of command output.
+inline void cmdEndLine() { Serial.print('\n'); }
 
 void handleCommandText(const String &cmd);
