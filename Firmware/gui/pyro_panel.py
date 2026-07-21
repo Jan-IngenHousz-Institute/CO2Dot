@@ -29,10 +29,11 @@ class PyroPanel(QGroupBox):
     connect_requested    = Signal(str, int, float)  # port, channel, interval_s
     disconnect_requested = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, busy_ports_provider=None, parent=None):
         super().__init__("Pyroscience", parent)
         self._connected = False
         self._streaming = False
+        self._busy_ports_provider = busy_ports_provider
         self._build_ui()
         self._refresh_ports()
         self._refresh_enabled()
@@ -92,7 +93,13 @@ class PyroPanel(QGroupBox):
     def _refresh_ports(self) -> None:
         current = self._port_combo.currentText()
         self._port_combo.clear()
-        ports = device_manager.list_ports()
+        busy = {}
+        if self._busy_ports_provider is not None:
+            try:
+                busy = dict(self._busy_ports_provider())
+            except Exception:
+                busy = {}
+        ports = [p for p in device_manager.list_ports() if p not in busy]
         for p in ports:
             self._port_combo.addItem(p)
         if not ports:
@@ -111,6 +118,16 @@ class PyroPanel(QGroupBox):
         self.connect_requested.emit(
             port, self._channel_spin.value(), float(self._interval_spin.value())
         )
+
+    def set_port(self, port: str) -> None:
+        """Select a (possibly newly detected) port; no-op while connected."""
+        if self._connected or not port:
+            return
+        idx = self._port_combo.findText(port)
+        if idx < 0:
+            self._port_combo.addItem(port)
+            idx = self._port_combo.findText(port)
+        self._port_combo.setCurrentIndex(idx)
 
     # Public slots called by MainWindow
     def on_connected(self, info: dict) -> None:

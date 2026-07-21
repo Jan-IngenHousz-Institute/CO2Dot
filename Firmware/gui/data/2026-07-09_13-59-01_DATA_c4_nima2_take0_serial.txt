@@ -1,0 +1,23 @@
+timestamp	event	name	value	detail
+2026-07-09T13:59:01.089	param	led_V	0.0	snapshot at record start
+2026-07-09T13:59:01.089	param	pwm	100.0	snapshot at record start
+2026-07-09T14:08:53.310	param	pwm	100.0	
+2026-07-09T14:08:53.386	command			PWM 100
+2026-07-09T14:13:53.311	param	pwm	0.0	
+2026-07-09T14:13:53.313	command			PWM 0
+2026-07-09T14:14:13.318	param	pwm	100.0	
+2026-07-09T14:14:13.396	command			PWM 100
+2026-07-09T14:19:13.321	param	pwm	0.0	
+2026-07-09T14:19:13.401	command			PWM 0
+2026-07-09T14:19:33.323	param	pwm	100.0	
+2026-07-09T14:19:33.370	command			PWM 100
+2026-07-09T14:24:33.326	param	pwm	0.0	
+2026-07-09T14:24:33.404	command			PWM 0
+2026-07-09T14:24:53.339	param	pwm	100.0	
+2026-07-09T14:24:53.370	command			PWM 100
+2026-07-09T14:29:53.352	param	pwm	0.0	
+2026-07-09T14:29:53.461	command			PWM 0
+2026-07-09T14:30:13.364	param	pwm	0.0	
+2026-07-09T14:30:13.364	param	led_V	0.0	
+2026-07-09T14:30:13.367	script_end			
+2026-07-09T14:30:13.427	command			PWM 0

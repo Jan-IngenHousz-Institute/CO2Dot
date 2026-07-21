@@ -1,0 +1,638 @@
+timestamp	event	name	value	detail
+2026-07-07T12:51:44.631	param	led_V	0.0	snapshot at record start
+2026-07-07T12:51:44.631	param	pwm	10.0	snapshot at record start
+2026-07-07T12:52:13.258	param	pwm	10.0	
+2026-07-07T12:52:13.289	command			PWM 10
+2026-07-07T12:52:13.291	reply			PWM 10
+2026-07-07T12:52:13.296	reply			W (458094) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:52:13.299	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T12:52:13.299	reply			ambyte>
+2026-07-07T12:52:13.413	reply			ambyte>
+2026-07-07T12:53:13.266	param	pwm	0.0	
+2026-07-07T12:53:13.267	command			PWM 0
+2026-07-07T12:53:13.269	reply			PWM 0
+2026-07-07T12:53:13.280	reply			W (518074) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:53:13.285	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T12:53:13.285	reply			ambyte>
+2026-07-07T12:53:13.389	reply			ambyte>
+2026-07-07T12:53:18.267	param	pwm	10.0	
+2026-07-07T12:53:18.359	command			PWM 10
+2026-07-07T12:53:18.361	reply			PWM 10
+2026-07-07T12:53:18.365	reply			W (523164) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:53:18.366	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T12:53:18.367	reply			ambyte>
+2026-07-07T12:53:18.468	reply			ambyte>
+2026-07-07T12:54:18.278	param	pwm	0.0	
+2026-07-07T12:54:18.310	command			PWM 0
+2026-07-07T12:54:18.311	reply			PWM 0
+2026-07-07T12:54:18.314	reply			W (583124) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:54:18.315	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T12:54:18.315	reply			ambyte>
+2026-07-07T12:54:18.420	reply			ambyte>
+2026-07-07T12:54:23.281	param	pwm	10.0	
+2026-07-07T12:54:23.327	command			PWM 10
+2026-07-07T12:54:23.329	reply			PWM 10
+2026-07-07T12:54:23.332	reply			W (588134) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:54:23.333	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T12:54:23.334	reply			ambyte>
+2026-07-07T12:54:23.436	reply			ambyte>
+2026-07-07T12:55:23.285	param	pwm	0.0	
+2026-07-07T12:55:23.331	command			PWM 0
+2026-07-07T12:55:23.332	reply			PWM 0
+2026-07-07T12:55:23.335	reply			W (648144) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:55:23.336	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T12:55:23.337	reply			ambyte>
+2026-07-07T12:55:23.440	reply			ambyte>
+2026-07-07T12:55:28.299	param	pwm	10.0	
+2026-07-07T12:55:28.346	command			PWM 10
+2026-07-07T12:55:28.347	reply			PWM 10
+2026-07-07T12:55:28.349	reply			W (653154) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:55:28.351	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T12:55:28.351	reply			ambyte>
+2026-07-07T12:55:28.455	reply			ambyte>
+2026-07-07T12:56:28.301	param	pwm	0.0	
+2026-07-07T12:56:28.395	command			PWM 0
+2026-07-07T12:56:28.397	reply			PWM 0
+2026-07-07T12:56:28.400	reply			W (713204) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:56:28.402	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T12:56:28.402	reply			ambyte>
+2026-07-07T12:56:28.505	reply			ambyte>
+2026-07-07T12:56:33.303	param	pwm	10.0	
+2026-07-07T12:56:33.413	command			PWM 10
+2026-07-07T12:56:33.414	reply			PWM 10
+2026-07-07T12:56:33.417	reply			W (718224) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:56:33.419	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T12:56:33.419	reply			ambyte>
+2026-07-07T12:56:33.522	reply			ambyte>
+2026-07-07T12:57:33.303	param	pwm	0.0	
+2026-07-07T12:57:33.337	command			PWM 0
+2026-07-07T12:57:33.337	reply			PWM 0
+2026-07-07T12:57:33.339	reply			W (778144) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:57:33.340	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T12:57:33.340	reply			ambyte>
+2026-07-07T12:57:33.444	reply			ambyte>
+2026-07-07T12:57:38.754	param	led_V	0.05	
+2026-07-07T12:57:38.754	param	pwm	10.0	
+2026-07-07T12:57:38.800	command			PWM 10
+2026-07-07T12:57:38.801	reply			PWM 10
+2026-07-07T12:57:38.803	reply			W (783614) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:57:38.805	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T12:57:38.805	reply			ambyte>
+2026-07-07T12:57:38.909	reply			ambyte>
+2026-07-07T12:58:38.759	param	pwm	10.0	
+2026-07-07T12:58:38.789	command			PWM 10
+2026-07-07T12:58:38.790	reply			PWM 10
+2026-07-07T12:58:38.792	reply			W (843604) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:58:38.793	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T12:58:38.794	reply			ambyte>
+2026-07-07T12:58:38.898	reply			ambyte>
+2026-07-07T12:59:38.762	param	pwm	0.0	
+2026-07-07T12:59:38.856	command			PWM 0
+2026-07-07T12:59:38.857	reply			PWM 0
+2026-07-07T12:59:38.860	reply			W (903664) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:59:38.861	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T12:59:38.862	reply			ambyte>
+2026-07-07T12:59:38.966	reply			ambyte>
+2026-07-07T12:59:43.776	param	pwm	10.0	
+2026-07-07T12:59:43.885	command			PWM 10
+2026-07-07T12:59:43.886	reply			PWM 10
+2026-07-07T12:59:43.889	reply			W (908694) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T12:59:43.890	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T12:59:43.891	reply			ambyte>
+2026-07-07T12:59:43.994	reply			ambyte>
+2026-07-07T13:00:43.778	param	pwm	0.0	
+2026-07-07T13:00:43.870	command			PWM 0
+2026-07-07T13:00:43.871	reply			PWM 0
+2026-07-07T13:00:43.875	reply			W (968684) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:00:43.876	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:00:43.877	reply			ambyte>
+2026-07-07T13:00:43.979	reply			ambyte>
+2026-07-07T13:00:48.792	param	pwm	10.0	
+2026-07-07T13:00:48.792	command			PWM 10
+2026-07-07T13:00:48.793	reply			PWM 10
+2026-07-07T13:00:48.805	reply			W (973604) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:00:48.806	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:00:48.807	reply			ambyte>
+2026-07-07T13:00:48.918	reply			ambyte>
+2026-07-07T13:01:48.804	param	pwm	0.0	
+2026-07-07T13:01:48.865	command			PWM 0
+2026-07-07T13:01:48.866	reply			PWM 0
+2026-07-07T13:01:48.869	reply			W (1033674) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:01:48.870	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:01:48.871	reply			ambyte>
+2026-07-07T13:01:48.974	reply			ambyte>
+2026-07-07T13:01:53.815	param	pwm	10.0	
+2026-07-07T13:01:53.894	command			PWM 10
+2026-07-07T13:01:53.895	reply			PWM 10
+2026-07-07T13:01:53.898	reply			W (1038704) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:01:53.899	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:01:53.900	reply			ambyte>
+2026-07-07T13:01:54.003	reply			ambyte>
+2026-07-07T13:02:53.830	param	pwm	0.0	
+2026-07-07T13:02:53.877	command			PWM 0
+2026-07-07T13:02:53.878	reply			PWM 0
+2026-07-07T13:02:53.881	reply			W (1098694) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:02:53.882	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:02:53.883	reply			ambyte>
+2026-07-07T13:02:53.985	reply			ambyte>
+2026-07-07T13:02:58.832	param	pwm	10.0	
+2026-07-07T13:02:58.896	command			PWM 10
+2026-07-07T13:02:58.897	reply			PWM 10
+2026-07-07T13:02:58.901	reply			W (1103704) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:02:58.902	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:02:58.903	reply			ambyte>
+2026-07-07T13:02:59.004	reply			ambyte>
+2026-07-07T13:03:58.839	param	pwm	0.0	
+2026-07-07T13:03:58.881	command			PWM 0
+2026-07-07T13:03:58.883	reply			PWM 0
+2026-07-07T13:03:58.886	reply			W (1163694) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:03:58.887	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:03:58.888	reply			ambyte>
+2026-07-07T13:03:58.985	reply			ambyte>
+2026-07-07T13:04:03.852	param	led_V	0.1	
+2026-07-07T13:04:03.852	param	pwm	10.0	
+2026-07-07T13:04:03.943	command			PWM 10
+2026-07-07T13:04:03.947	reply			PWM 10
+2026-07-07T13:04:03.970	reply			W (1168754) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:04:03.985	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:04:03.985	reply			ambyte>
+2026-07-07T13:04:04.085	reply			ambyte>
+2026-07-07T13:05:03.860	param	pwm	10.0	
+2026-07-07T13:05:03.922	command			PWM 10
+2026-07-07T13:05:03.923	reply			PWM 10
+2026-07-07T13:05:03.947	reply			W (1228734) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:05:03.956	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:05:03.960	reply			ambyte>
+2026-07-07T13:05:04.065	reply			ambyte>
+2026-07-07T13:06:03.861	param	pwm	0.0	
+2026-07-07T13:06:03.893	command			PWM 0
+2026-07-07T13:06:03.894	reply			PWM 0
+2026-07-07T13:06:03.897	reply			W (1288704) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:06:03.898	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:06:03.899	reply			ambyte>
+2026-07-07T13:06:03.996	reply			ambyte>
+2026-07-07T13:06:08.865	param	pwm	10.0	
+2026-07-07T13:06:08.867	command			PWM 10
+2026-07-07T13:06:08.870	reply			PWM 10
+2026-07-07T13:06:08.879	reply			W (1293684) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:06:08.880	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:06:08.881	reply			ambyte>
+2026-07-07T13:06:08.980	reply			ambyte>
+2026-07-07T13:07:08.873	param	pwm	0.0	
+2026-07-07T13:07:08.904	command			PWM 0
+2026-07-07T13:07:08.905	reply			PWM 0
+2026-07-07T13:07:08.909	reply			W (1353714) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:07:08.910	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:07:08.911	reply			ambyte>
+2026-07-07T13:07:09.008	reply			ambyte>
+2026-07-07T13:07:13.880	param	pwm	10.0	
+2026-07-07T13:07:13.978	command			PWM 10
+2026-07-07T13:07:13.981	reply			PWM 10
+2026-07-07T13:07:13.988	reply			W (1358794) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:07:13.989	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:07:13.990	reply			ambyte>
+2026-07-07T13:07:14.088	reply			ambyte>
+2026-07-07T13:08:13.881	param	pwm	0.0	
+2026-07-07T13:08:13.956	command			PWM 0
+2026-07-07T13:08:13.957	reply			PWM 0
+2026-07-07T13:08:13.970	reply			W (1418774) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:08:13.970	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:08:13.971	reply			ambyte>
+2026-07-07T13:08:14.066	reply			ambyte>
+2026-07-07T13:08:18.886	param	pwm	10.0	
+2026-07-07T13:08:18.917	command			PWM 10
+2026-07-07T13:08:18.918	reply			PWM 10
+2026-07-07T13:08:18.921	reply			W (1423734) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:08:18.923	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:08:18.924	reply			ambyte>
+2026-07-07T13:08:19.030	reply			ambyte>
+2026-07-07T13:09:18.887	param	pwm	0.0	
+2026-07-07T13:09:18.929	command			PWM 0
+2026-07-07T13:09:18.930	reply			PWM 0
+2026-07-07T13:09:18.934	reply			W (1483744) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:09:18.936	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:09:18.936	reply			ambyte>
+2026-07-07T13:09:19.033	reply			ambyte>
+2026-07-07T13:09:23.900	param	pwm	10.0	
+2026-07-07T13:09:23.901	command			PWM 10
+2026-07-07T13:09:23.904	reply			PWM 10
+2026-07-07T13:09:23.921	reply			W (1488714) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:09:23.924	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:09:23.924	reply			ambyte>
+2026-07-07T13:09:24.021	reply			ambyte>
+2026-07-07T13:10:23.903	param	pwm	0.0	
+2026-07-07T13:10:23.946	command			PWM 0
+2026-07-07T13:10:23.947	reply			PWM 0
+2026-07-07T13:10:23.948	reply			W (1548764) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:10:23.949	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:10:23.950	reply			ambyte>
+2026-07-07T13:10:24.048	reply			ambyte>
+2026-07-07T13:10:28.913	param	led_V	0.15	
+2026-07-07T13:10:28.913	param	pwm	10.0	
+2026-07-07T13:10:29.013	command			PWM 10
+2026-07-07T13:10:29.014	reply			PWM 10
+2026-07-07T13:10:29.017	reply			W (1553824) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:10:29.019	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:10:29.020	reply			ambyte>
+2026-07-07T13:10:29.126	reply			ambyte>
+2026-07-07T13:11:28.916	param	pwm	10.0	
+2026-07-07T13:11:28.968	command			PWM 10
+2026-07-07T13:11:28.969	reply			PWM 10
+2026-07-07T13:11:28.972	reply			W (1613784) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:11:28.974	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:11:28.974	reply			ambyte>
+2026-07-07T13:11:29.071	reply			ambyte>
+2026-07-07T13:12:28.919	param	pwm	0.0	
+2026-07-07T13:12:28.991	command			PWM 0
+2026-07-07T13:12:28.992	reply			PWM 0
+2026-07-07T13:12:28.995	reply			W (1673804) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:12:28.996	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:12:28.997	reply			ambyte>
+2026-07-07T13:12:29.095	reply			ambyte>
+2026-07-07T13:12:33.920	param	pwm	10.0	
+2026-07-07T13:12:33.962	command			PWM 10
+2026-07-07T13:12:33.964	reply			PWM 10
+2026-07-07T13:12:33.981	reply			W (1678774) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:12:33.987	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:12:33.988	reply			ambyte>
+2026-07-07T13:12:34.086	reply			ambyte>
+2026-07-07T13:13:33.931	param	pwm	0.0	
+2026-07-07T13:13:34.022	command			PWM 0
+2026-07-07T13:13:34.023	reply			PWM 0
+2026-07-07T13:13:34.026	reply			W (1738834) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:13:34.027	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:13:34.027	reply			ambyte>
+2026-07-07T13:13:34.125	reply			ambyte>
+2026-07-07T13:13:38.937	param	pwm	10.0	
+2026-07-07T13:13:38.988	command			PWM 10
+2026-07-07T13:13:38.990	reply			PWM 10
+2026-07-07T13:13:38.992	reply			W (1743804) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:13:38.994	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:13:38.994	reply			ambyte>
+2026-07-07T13:13:39.091	reply			ambyte>
+2026-07-07T13:14:38.943	param	pwm	0.0	
+2026-07-07T13:14:39.026	command			PWM 0
+2026-07-07T13:14:39.027	reply			PWM 0
+2026-07-07T13:14:39.030	reply			W (1803844) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:14:39.032	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:14:39.032	reply			ambyte>
+2026-07-07T13:14:39.129	reply			ambyte>
+2026-07-07T13:14:43.950	param	pwm	10.0	
+2026-07-07T13:14:43.991	command			PWM 10
+2026-07-07T13:14:43.992	reply			PWM 10
+2026-07-07T13:14:43.996	reply			W (1808804) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:14:43.998	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:14:43.998	reply			ambyte>
+2026-07-07T13:14:44.105	reply			ambyte>
+2026-07-07T13:15:43.958	param	pwm	0.0	
+2026-07-07T13:15:43.968	command			PWM 0
+2026-07-07T13:15:43.970	reply			PWM 0
+2026-07-07T13:15:43.971	reply			W (1868784) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:15:43.971	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:15:43.971	reply			ambyte>
+2026-07-07T13:15:44.071	reply			ambyte>
+2026-07-07T13:15:48.968	param	pwm	10.0	
+2026-07-07T13:15:49.041	command			PWM 10
+2026-07-07T13:15:49.042	reply			PWM 10
+2026-07-07T13:15:49.046	reply			W (1873854) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:15:49.047	reply			PWM GPIO4: 10.00% @ 10000 Hz (12-bit)
+2026-07-07T13:15:49.048	reply			ambyte>
+2026-07-07T13:15:49.144	reply			ambyte>
+2026-07-07T13:16:48.970	param	pwm	0.0	
+2026-07-07T13:16:48.981	command			PWM 0
+2026-07-07T13:16:48.982	reply			PWM 0
+2026-07-07T13:16:48.985	reply			W (1933794) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:16:48.986	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:16:48.987	reply			ambyte>
+2026-07-07T13:16:49.084	reply			ambyte>
+2026-07-07T13:16:53.981	param	pwm	0.0	
+2026-07-07T13:16:53.982	param	led_V	0.0	
+2026-07-07T13:16:53.984	script_end			
+2026-07-07T13:16:54.053	command			PWM 0
+2026-07-07T13:16:54.054	reply			PWM 0
+2026-07-07T13:16:54.057	reply			W (1938874) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T13:16:54.058	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T13:16:54.059	reply			ambyte>
+2026-07-07T13:16:54.156	reply			ambyte>
+2026-07-07T15:24:16.653	script_start			
+2026-07-07T15:24:16.655	param	led_V	0.0	
+2026-07-07T15:24:16.655	param	pwm	2.0	
+2026-07-07T15:24:16.734	command			PWM 2
+2026-07-07T15:24:16.735	reply			PWM 2
+2026-07-07T15:24:16.737	reply			W (9581604) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:24:16.739	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:24:16.739	reply			ambyte>
+2026-07-07T15:24:16.843	reply			ambyte>
+2026-07-07T15:34:16.665	param	pwm	2.0	
+2026-07-07T15:34:16.738	command			PWM 2
+2026-07-07T15:34:16.739	reply			PWM 2
+2026-07-07T15:34:16.742	reply			W (10181614) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:34:16.744	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:34:16.744	reply			ambyte>
+2026-07-07T15:34:16.845	reply			ambyte>
+2026-07-07T15:35:16.668	param	pwm	0.0	
+2026-07-07T15:35:16.691	command			PWM 0
+2026-07-07T15:35:16.691	reply			PWM 0
+2026-07-07T15:35:16.693	reply			W (10241564) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:35:16.694	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T15:35:16.694	reply			ambyte>
+2026-07-07T15:35:16.797	reply			ambyte>
+2026-07-07T15:35:21.677	param	pwm	2.0	
+2026-07-07T15:35:21.774	command			PWM 2
+2026-07-07T15:35:21.775	reply			PWM 2
+2026-07-07T15:35:21.779	reply			W (10246644) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:35:21.780	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:35:21.781	reply			ambyte>
+2026-07-07T15:35:21.880	reply			ambyte>
+2026-07-07T15:36:21.678	param	pwm	0.0	
+2026-07-07T15:36:21.700	command			PWM 0
+2026-07-07T15:36:21.705	reply			PWM 0
+2026-07-07T15:36:21.713	reply			W (10306574) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:36:21.713	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T15:36:21.714	reply			ambyte>
+2026-07-07T15:36:21.812	reply			ambyte>
+2026-07-07T15:36:26.685	param	pwm	2.0	
+2026-07-07T15:36:26.685	command			PWM 2
+2026-07-07T15:36:26.686	reply			PWM 2
+2026-07-07T15:36:26.712	reply			W (10311554) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:36:26.721	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:36:26.722	reply			ambyte>
+2026-07-07T15:36:26.816	reply			ambyte>
+2026-07-07T15:37:26.690	param	pwm	0.0	
+2026-07-07T15:37:26.703	command			PWM 0
+2026-07-07T15:37:26.710	reply			PWM 0
+2026-07-07T15:37:26.723	reply			W (10371574) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:37:26.729	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T15:37:26.731	reply			ambyte>
+2026-07-07T15:37:26.836	reply			ambyte>
+2026-07-07T15:37:31.698	param	pwm	2.0	
+2026-07-07T15:37:31.700	command			PWM 2
+2026-07-07T15:37:31.703	reply			PWM 2
+2026-07-07T15:37:31.721	reply			W (10376574) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:37:31.726	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:37:31.726	reply			ambyte>
+2026-07-07T15:37:31.827	reply			ambyte>
+2026-07-07T15:38:31.705	param	pwm	0.0	
+2026-07-07T15:38:31.747	command			PWM 0
+2026-07-07T15:38:31.748	reply			PWM 0
+2026-07-07T15:38:31.751	reply			W (10436624) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:38:31.753	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T15:38:31.753	reply			ambyte>
+2026-07-07T15:38:31.853	reply			ambyte>
+2026-07-07T15:38:36.714	param	pwm	2.0	
+2026-07-07T15:38:36.734	command			PWM 2
+2026-07-07T15:38:36.735	reply			PWM 2
+2026-07-07T15:38:36.737	reply			W (10441604) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:38:36.738	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:38:36.738	reply			ambyte>
+2026-07-07T15:38:36.840	reply			ambyte>
+2026-07-07T15:39:36.717	param	pwm	0.0	
+2026-07-07T15:39:36.727	command			PWM 0
+2026-07-07T15:39:36.728	reply			PWM 0
+2026-07-07T15:39:36.745	reply			W (10501604) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:39:36.746	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T15:39:36.746	reply			ambyte>
+2026-07-07T15:39:36.846	reply			ambyte>
+2026-07-07T15:39:41.730	param	led_V	0.05	
+2026-07-07T15:39:41.730	param	pwm	2.0	
+2026-07-07T15:39:41.822	command			PWM 2
+2026-07-07T15:39:41.823	reply			PWM 2
+2026-07-07T15:39:41.827	reply			W (10506694) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:39:41.828	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:39:41.828	reply			ambyte>
+2026-07-07T15:39:41.926	reply			ambyte>
+2026-07-07T15:49:41.729	param	pwm	2.0	
+2026-07-07T15:49:41.751	command			PWM 2
+2026-07-07T15:49:41.753	reply			PWM 2
+2026-07-07T15:49:41.759	reply			W (11106624) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:49:41.759	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:49:41.759	reply			ambyte>
+2026-07-07T15:49:41.853	reply			ambyte>
+2026-07-07T15:50:41.735	param	pwm	0.0	
+2026-07-07T15:50:41.827	command			PWM 0
+2026-07-07T15:50:41.828	reply			PWM 0
+2026-07-07T15:50:41.831	reply			W (11166704) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:50:41.832	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T15:50:41.833	reply			ambyte>
+2026-07-07T15:50:41.930	reply			ambyte>
+2026-07-07T15:50:46.741	param	pwm	2.0	
+2026-07-07T15:50:46.771	command			PWM 2
+2026-07-07T15:50:46.772	reply			PWM 2
+2026-07-07T15:50:46.774	reply			W (11171644) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:50:46.775	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:50:46.775	reply			ambyte>
+2026-07-07T15:50:46.875	reply			ambyte>
+2026-07-07T15:51:46.745	param	pwm	0.0	
+2026-07-07T15:51:46.817	command			PWM 0
+2026-07-07T15:51:46.818	reply			PWM 0
+2026-07-07T15:51:46.821	reply			W (11231694) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:51:46.823	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T15:51:46.824	reply			ambyte>
+2026-07-07T15:51:46.920	reply			ambyte>
+2026-07-07T15:51:51.752	param	pwm	2.0	
+2026-07-07T15:51:51.783	command			PWM 2
+2026-07-07T15:51:51.783	reply			PWM 2
+2026-07-07T15:51:51.785	reply			W (11236664) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:51:51.786	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:51:51.786	reply			ambyte>
+2026-07-07T15:51:51.885	reply			ambyte>
+2026-07-07T15:52:51.759	param	pwm	0.0	
+2026-07-07T15:52:51.842	command			PWM 0
+2026-07-07T15:52:51.843	reply			PWM 0
+2026-07-07T15:52:51.846	reply			W (11296724) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:52:51.848	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T15:52:51.848	reply			ambyte>
+2026-07-07T15:52:51.944	reply			ambyte>
+2026-07-07T15:52:56.760	param	pwm	2.0	
+2026-07-07T15:52:56.780	command			PWM 2
+2026-07-07T15:52:56.781	reply			PWM 2
+2026-07-07T15:52:56.790	reply			W (11301654) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:52:56.791	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:52:56.791	reply			ambyte>
+2026-07-07T15:52:56.893	reply			ambyte>
+2026-07-07T15:53:56.764	param	pwm	0.0	
+2026-07-07T15:53:56.836	command			PWM 0
+2026-07-07T15:53:56.837	reply			PWM 0
+2026-07-07T15:53:56.841	reply			W (11361714) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:53:56.842	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T15:53:56.843	reply			ambyte>
+2026-07-07T15:53:56.949	reply			ambyte>
+2026-07-07T15:54:01.767	param	pwm	2.0	
+2026-07-07T15:54:01.788	command			PWM 2
+2026-07-07T15:54:01.790	reply			PWM 2
+2026-07-07T15:54:01.805	reply			W (11366664) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:54:01.805	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:54:01.805	reply			ambyte>
+2026-07-07T15:54:01.901	reply			ambyte>
+2026-07-07T15:55:01.774	param	pwm	0.0	
+2026-07-07T15:55:01.866	command			PWM 0
+2026-07-07T15:55:01.867	reply			PWM 0
+2026-07-07T15:55:01.871	reply			W (11426744) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:55:01.871	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T15:55:01.871	reply			ambyte>
+2026-07-07T15:55:01.983	reply			ambyte>
+2026-07-07T15:55:06.778	param	led_V	0.1	
+2026-07-07T15:55:06.778	param	pwm	2.0	
+2026-07-07T15:55:06.815	command			PWM 2
+2026-07-07T15:55:06.816	reply			PWM 2
+2026-07-07T15:55:06.818	reply			W (11431694) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T15:55:06.819	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T15:55:06.819	reply			ambyte>
+2026-07-07T15:55:06.918	reply			ambyte>
+2026-07-07T16:05:06.775	param	pwm	2.0	
+2026-07-07T16:05:06.816	command			PWM 2
+2026-07-07T16:05:06.817	reply			PWM 2
+2026-07-07T16:05:06.819	reply			W (12031694) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:05:06.820	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:05:06.820	reply			ambyte>
+2026-07-07T16:05:06.919	reply			ambyte>
+2026-07-07T16:06:06.785	param	pwm	0.0	
+2026-07-07T16:06:06.845	command			PWM 0
+2026-07-07T16:06:06.847	reply			PWM 0
+2026-07-07T16:06:06.850	reply			W (12091724) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:06:06.852	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:06:06.852	reply			ambyte>
+2026-07-07T16:06:06.948	reply			ambyte>
+2026-07-07T16:06:11.791	param	pwm	2.0	
+2026-07-07T16:06:11.793	command			PWM 2
+2026-07-07T16:06:11.794	reply			PWM 2
+2026-07-07T16:06:11.819	reply			W (12096674) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:06:11.827	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:06:11.827	reply			ambyte>
+2026-07-07T16:06:11.924	reply			ambyte>
+2026-07-07T16:07:11.792	param	pwm	0.0	
+2026-07-07T16:07:11.874	command			PWM 0
+2026-07-07T16:07:11.875	reply			PWM 0
+2026-07-07T16:07:11.878	reply			W (12156754) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:07:11.879	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:07:11.880	reply			ambyte>
+2026-07-07T16:07:11.977	reply			ambyte>
+2026-07-07T16:07:16.802	param	pwm	2.0	
+2026-07-07T16:07:16.813	command			PWM 2
+2026-07-07T16:07:16.817	reply			PWM 2
+2026-07-07T16:07:16.828	reply			W (12161694) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:07:16.828	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:07:16.828	reply			ambyte>
+2026-07-07T16:07:16.925	reply			ambyte>
+2026-07-07T16:08:16.811	param	pwm	0.0	
+2026-07-07T16:08:16.852	command			PWM 0
+2026-07-07T16:08:16.853	reply			PWM 0
+2026-07-07T16:08:16.856	reply			W (12221734) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:08:16.858	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:08:16.858	reply			ambyte>
+2026-07-07T16:08:16.955	reply			ambyte>
+2026-07-07T16:08:21.821	param	pwm	2.0	
+2026-07-07T16:08:21.904	command			PWM 2
+2026-07-07T16:08:21.904	reply			PWM 2
+2026-07-07T16:08:21.907	reply			W (12226784) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:08:21.909	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:08:21.909	reply			ambyte>
+2026-07-07T16:08:22.016	reply			ambyte>
+2026-07-07T16:09:21.822	param	pwm	0.0	
+2026-07-07T16:09:21.874	command			PWM 0
+2026-07-07T16:09:21.875	reply			PWM 0
+2026-07-07T16:09:21.877	reply			W (12286754) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:09:21.879	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:09:21.879	reply			ambyte>
+2026-07-07T16:09:21.977	reply			ambyte>
+2026-07-07T16:09:26.832	param	pwm	2.0	
+2026-07-07T16:09:26.924	command			PWM 2
+2026-07-07T16:09:26.925	reply			PWM 2
+2026-07-07T16:09:26.929	reply			W (12291804) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:09:26.930	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:09:26.931	reply			ambyte>
+2026-07-07T16:09:27.036	reply			ambyte>
+2026-07-07T16:10:26.839	param	pwm	0.0	
+2026-07-07T16:10:26.880	command			PWM 0
+2026-07-07T16:10:26.881	reply			PWM 0
+2026-07-07T16:10:26.883	reply			W (12351764) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:10:26.884	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:10:26.884	reply			ambyte>
+2026-07-07T16:10:26.984	reply			ambyte>
+2026-07-07T16:10:31.843	param	led_V	0.15	
+2026-07-07T16:10:31.843	param	pwm	2.0	
+2026-07-07T16:10:31.932	command			PWM 2
+2026-07-07T16:10:31.933	reply			PWM 2
+2026-07-07T16:10:31.937	reply			W (12356814) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:10:31.938	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:10:31.939	reply			ambyte>
+2026-07-07T16:10:32.035	reply			ambyte>
+2026-07-07T16:20:31.840	param	pwm	2.0	
+2026-07-07T16:20:31.912	command			PWM 2
+2026-07-07T16:20:31.914	reply			PWM 2
+2026-07-07T16:20:31.916	reply			W (12956804) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:20:31.918	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:20:31.918	reply			ambyte>
+2026-07-07T16:20:32.014	reply			ambyte>
+2026-07-07T16:21:31.845	param	pwm	0.0	
+2026-07-07T16:21:31.859	command			PWM 0
+2026-07-07T16:21:31.866	reply			PWM 0
+2026-07-07T16:21:31.873	reply			W (13016744) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:21:31.874	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:21:31.874	reply			ambyte>
+2026-07-07T16:21:31.969	reply			ambyte>
+2026-07-07T16:21:36.849	param	pwm	2.0	
+2026-07-07T16:21:36.911	command			PWM 2
+2026-07-07T16:21:36.912	reply			PWM 2
+2026-07-07T16:21:36.915	reply			W (13021804) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:21:36.917	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:21:36.918	reply			ambyte>
+2026-07-07T16:21:37.015	reply			ambyte>
+2026-07-07T16:22:36.850	param	pwm	0.0	
+2026-07-07T16:22:36.852	command			PWM 0
+2026-07-07T16:22:36.853	reply			PWM 0
+2026-07-07T16:22:36.886	reply			W (13081734) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:22:36.886	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:22:36.886	reply			ambyte>
+2026-07-07T16:22:36.984	reply			ambyte>
+2026-07-07T16:22:41.852	param	pwm	2.0	
+2026-07-07T16:22:41.924	command			PWM 2
+2026-07-07T16:22:41.925	reply			PWM 2
+2026-07-07T16:22:41.928	reply			W (13086814) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:22:41.930	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:22:41.930	reply			ambyte>
+2026-07-07T16:22:42.026	reply			ambyte>
+2026-07-07T16:23:41.856	param	pwm	0.0	
+2026-07-07T16:23:41.865	command			PWM 0
+2026-07-07T16:23:41.874	reply			PWM 0
+2026-07-07T16:23:41.890	reply			W (13146754) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:23:41.900	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:23:41.903	reply			ambyte>
+2026-07-07T16:23:42.009	reply			ambyte>
+2026-07-07T16:23:46.861	param	pwm	2.0	
+2026-07-07T16:23:46.943	command			PWM 2
+2026-07-07T16:23:46.944	reply			PWM 2
+2026-07-07T16:23:46.947	reply			W (13151834) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:23:46.948	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:23:46.949	reply			ambyte>
+2026-07-07T16:23:47.046	reply			ambyte>
+2026-07-07T16:24:46.870	param	pwm	0.0	
+2026-07-07T16:24:46.911	command			PWM 0
+2026-07-07T16:24:46.912	reply			PWM 0
+2026-07-07T16:24:46.913	reply			W (13211804) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:24:46.914	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:24:46.915	reply			ambyte>
+2026-07-07T16:24:47.014	reply			ambyte>
+2026-07-07T16:24:51.878	param	pwm	2.0	
+2026-07-07T16:24:51.960	command			PWM 2
+2026-07-07T16:24:51.962	reply			PWM 2
+2026-07-07T16:24:51.964	reply			W (13216854) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:24:51.966	reply			PWM GPIO4: 2.00% @ 10000 Hz (12-bit)
+2026-07-07T16:24:51.966	reply			ambyte>
+2026-07-07T16:24:52.073	reply			ambyte>
+2026-07-07T16:25:51.887	param	pwm	0.0	
+2026-07-07T16:25:51.928	command			PWM 0
+2026-07-07T16:25:51.929	reply			PWM 0
+2026-07-07T16:25:51.931	reply			W (13276814) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:25:51.933	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:25:51.933	reply			ambyte>
+2026-07-07T16:25:52.040	reply			ambyte>
+2026-07-07T16:25:56.889	param	pwm	0.0	
+2026-07-07T16:25:56.895	param	led_V	0.0	
+2026-07-07T16:25:56.919	script_end			
+2026-07-07T16:25:56.982	command			PWM 0
+2026-07-07T16:25:56.983	reply			PWM 0
+2026-07-07T16:25:56.987	reply			W (13281874) ledc: GPIO 4 is not usable, maybe conflict with others
+2026-07-07T16:25:56.989	reply			PWM GPIO4: 0.00% @ 10000 Hz (12-bit)
+2026-07-07T16:25:56.989	reply			ambyte>
+2026-07-07T16:25:57.096	reply			ambyte>

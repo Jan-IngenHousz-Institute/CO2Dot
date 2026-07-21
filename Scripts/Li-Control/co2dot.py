@@ -11,7 +11,8 @@ Mirrors the protocol used by the CO2Dot firmware/GUI
     dot.status()                # {'spectrometer': {...}, 'bme': {...}} settings
     dot.spec_flash(1)           # {'dark':..., 'lit':..., 'diff':...} spectra
     dot.env()                   # {'T','P','RH','Gas'} environment (BME688)
-    dot.set_gain(5); dot.set_atime(100); dot.set_astep(999)   # spectrometer config
+    dot.set_spectrometer(atime=100, astep=999, gain=5)        # tune all at once
+    dot.set_gain(5); dot.set_atime(100); dot.set_astep(999)   # or set individually
     dot.get_gain(), dot.get_atime(), dot.get_astep()          # read it back
     dot.close()
 
@@ -203,6 +204,44 @@ class CO2Dot:
                 "dark": channels("dark", "spectrometer_dark"),
                 "lit": channels("lit", "spectrometer_lit"),
                 "diff": channels("diff", "spectrometer_diff")}
+
+    def set_spectrometer(self, *, atime: Optional[int] = None,
+                         astep: Optional[int] = None, gain: Optional[int] = None,
+                         timeout_s: float = 4.0) -> Dict[str, Any]:
+        """Adjust spectrometer integration/gain; return the device's new config.
+
+        Pass any combination of:
+          atime  integration-time steps, 0-255      (-> spec_set_atime)
+          astep  integration step size, 0-65534     (-> spec_set_astep)
+          gain   analog-gain enum ordinal           (-> spec_set_gain)
+                   AS7341: 0=0.5x, 1=1x, 2=2x, ... 10=512x   (max 10)
+                   AS7343: 0=0.5x, 1=1x, ...        12=2048x (max 12)
+
+        Integration time ≈ (atime + 1) × (astep + 1) × 2.78 µs. Each supplied
+        setting is sent as its own command and the device echoes the full
+        {'atime','astep','gain'} after each; the final config is returned.
+        Raises RuntimeError if the device rejects a value (e.g. out of range or
+        gain above the model's max), ValueError if nothing/an out-of-range value
+        is passed.
+        """
+        if atime is None and astep is None and gain is None:
+            raise ValueError("set_spectrometer: pass at least one of atime, astep, gain")
+        if atime is not None and not 0 <= atime <= 255:
+            raise ValueError(f"atime must be 0-255, got {atime}")
+        if astep is not None and not 0 <= astep <= 65534:
+            raise ValueError(f"astep must be 0-65534, got {astep}")
+        if gain is not None and not 0 <= gain <= 12:
+            raise ValueError(f"gain must be a 0-12 enum ordinal, got {gain}")
+
+        keys = ("atime", "astep", "gain")   # success echoes all three (fillConfig)
+        config: Dict[str, Any] = {}
+        for cmd, val in (("spec_set_atime", atime),
+                         ("spec_set_astep", astep),
+                         ("spec_set_gain", gain)):
+            if val is None:
+                continue
+            config = self._command(f"{cmd},{int(val)}", keys, timeout_s)
+        return {k: config.get(k) for k in keys}
 
     def env(self, timeout_s: float = 4.0) -> Dict[str, Any]:
         """Environment from the onboard BME688: {'T','P','RH','Gas'}.

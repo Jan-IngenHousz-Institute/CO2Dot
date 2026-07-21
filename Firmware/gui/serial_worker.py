@@ -36,6 +36,10 @@ class SerialWorker(QThread):
         self._queue: queue.Queue[str] = queue.Queue()
         self._running = False
 
+    @property
+    def port(self) -> str:
+        return self._port
+
     # ------------------------------------------------------------------
     # Public API (called from the main thread)
     # ------------------------------------------------------------------
