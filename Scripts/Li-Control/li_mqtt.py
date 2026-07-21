@@ -25,8 +25,10 @@ firmware versions; snoop the live bus with mqtt_sniff.py to re-verify if needed.
 from __future__ import annotations
 
 import json
+import os
 import socket
 import time
+import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 import paho.mqtt.client as mqtt
@@ -119,11 +121,18 @@ class LI6800:
         li.set(co2_r=400, tair=25)   # change setpoints
     """
 
-    def __init__(self, broker: str, port: int = BROKER_PORT, *, client_id: str = "li-pc-client"):
+    def __init__(self, broker: str, port: int = BROKER_PORT, *, client_id: Optional[str] = None):
         self.broker = broker
         self.port = port
+        # Unique client id per handle. The MQTT broker drops any existing session when
+        # a second client connects with the SAME id, so a shared/hardcoded id makes two
+        # handles (a stale one left in the same kernel, or another notebook) ping-pong --
+        # each kicking the other offline, which silently drops published setpoints. The
+        # PID + random suffix stays unique even for several handles in one process. Pass
+        # client_id=... only if you deliberately need a fixed id.
+        self.client_id = client_id or f"li-pc-{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self._latest: Dict[str, Dict[str, Any]] = {}
-        self._client = _make_client(client_id)
+        self._client = _make_client(self.client_id)
         self._client.on_connect = self._on_connect
         self._client.on_message = self._on_message
 
