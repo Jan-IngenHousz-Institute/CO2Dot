@@ -3,11 +3,13 @@ main_window.py — QMainWindow for the CO2Dot controller GUI.
 """
 
 import json
+import re
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 import pyqtgraph as pg
 
 from PySide6.QtCore import Qt, QStandardPaths, QTimer
@@ -20,6 +22,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QRadioButton,
     QScrollArea,
@@ -63,6 +66,18 @@ PYRO_COLORS = [
     "#5a4f9e", "#f8b500", "#576574", "#10ac84", "#ff9ff3", "#341f97",
     "#01a3a4", "#ee5a24", "#7bed9f", "#ff7f50",
 ]
+
+# Serial-Scripting parameter step curves (distinct from the other palettes)
+EXT_SERIAL_COLORS = [
+    "#f9e2af", "#89b4fa", "#f38ba8", "#a6e3a1", "#cba6f7", "#fab387",
+    "#94e2d5", "#eba0ac",
+]
+
+# Console lines shaped like a script-helper call run through the script
+# engine instead of going out raw over serial (dc_offset lives on the PC,
+# not on the ESP32). Deliberately narrow so CLI text like "help" stays raw.
+EXT_HELPER_RE = re.compile(
+    r"^\s*(?:send|wait|param|pwm|dc_offset|print)\s*\(.*\)\s*$")
 
 # Interval dropdown: label → seconds
 INTERVALS = [
@@ -166,6 +181,39 @@ class MainWindow(QMainWindow):
         self._pyro_idnr = ""
         self._pyro_channel = 1
 
+        # Serial Scripting state (all lazily created)
+        self._ext_serial_enabled = bool(
+            self._gui_cfg.get("ext_serial_enabled", False))
+        self._ext_serial_panel = None
+        self._ext_serial_worker = None
+        self._ext_serial_runner = None
+        self._ext_serial_plot = None
+        self._ext_serial_time_axis = None
+        self._ext_serial_legend = None
+        self._ext_serial_curves: dict[str, pg.PlotDataItem] = {}
+        # Params differ wildly in scale (led_V 0-0.3 V vs pwm 0-100), so
+        # each gets its own ViewBox + y-axis, mirroring the BME plot.
+        self._ext_serial_vbs: dict[str, pg.ViewBox] = {}
+        self._ext_serial_axes: dict[str, pg.AxisItem] = {}
+        self._ext_serial_buffer = None
+        self._ext_serial_recorder = None
+        # Main-thread-owned param cache: the ONLY writer is the queued
+        # param_set slot, so no locking is needed anywhere.
+        self._last_ext_params: dict[str, float] = {}
+        self._ext_extra_cols: list[str] = []
+        self._ext_missing_warned: set[str] = set()
+        self._ext_wrong_port_hinted = False
+        self._ext_console_runner = None   # one-shot runner for console helpers
+        # Param events alone can't extend step curves to "now" — a slow
+        # timer keeps the held levels visually current while enabled.
+        self._ext_plot_timer = QTimer(self)
+        self._ext_plot_timer.setInterval(1000)
+        self._ext_plot_timer.timeout.connect(self._update_ext_serial_plot)
+
+        # Shared port autodetect (Pyroscience + ambyte); one sweep fills
+        # whichever panels exist.
+        self._port_probe_thread = None
+
         # Pyqtgraph global style
         pg.setConfigOption("background", "#1e1e2e")
         pg.setConfigOption("foreground", "#cdd6f4")
@@ -193,13 +241,22 @@ class MainWindow(QMainWindow):
         left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         left_scroll.setFrameShape(QScrollArea.NoFrame)
         left_scroll.setMinimumWidth(250)
-        left_scroll.setMaximumWidth(340)
+        left_scroll.setMaximumWidth(700)
 
         # Right panel (plots + controls)
         right_panel = self._build_right_panel()
 
-        root.addWidget(left_scroll)
-        root.addWidget(right_panel, stretch=1)
+        # Horizontal splitter so the left column can be dragged wider
+        # (needed for the Serial Scripting editor/console).
+        h_split = QSplitter(Qt.Horizontal)
+        h_split.addWidget(left_scroll)
+        h_split.addWidget(right_panel)
+        h_split.setStretchFactor(0, 0)
+        h_split.setStretchFactor(1, 1)
+        h_split.setCollapsible(0, False)
+        h_split.setCollapsible(1, False)
+        h_split.setSizes([320, 960])
+        root.addWidget(h_split, stretch=1)
 
         # Status bar
         self._status_bar = QStatusBar()
@@ -226,6 +283,15 @@ class MainWindow(QMainWindow):
                 self._save_gui_config()
                 self._pyro_toggle_action.setChecked(False)
                 self._status_bar.showMessage(f"Pyroscience disabled: {exc}")
+        if self._ext_serial_enabled:
+            try:
+                self._init_ext_serial()
+            except Exception as exc:
+                self._ext_serial_enabled = False
+                self._gui_cfg["ext_serial_enabled"] = False
+                self._save_gui_config()
+                self._ext_serial_toggle_action.setChecked(False)
+                self._status_bar.showMessage(f"Serial Scripting disabled: {exc}")
 
     def _build_left_panel(self) -> QWidget:
         panel = QWidget()
@@ -245,11 +311,18 @@ class MainWindow(QMainWindow):
         self._refresh_btn.setToolTip("Refresh port list")
         self._refresh_btn.clicked.connect(self._refresh_ports)
 
+        self._auto_btn = QPushButton("Auto")
+        self._auto_btn.setFixedWidth(44)
+        self._auto_btn.setToolTip(
+            "Scan ports and auto-connect CO2Dot + Pyroscience")
+        self._auto_btn.clicked.connect(self._on_port_autodetect)
+
         port_row = QWidget()
         port_row_h = QHBoxLayout(port_row)
         port_row_h.setContentsMargins(0, 0, 0, 0)
         port_row_h.addWidget(self._port_combo, stretch=1)
         port_row_h.addWidget(self._refresh_btn)
+        port_row_h.addWidget(self._auto_btn)
 
         self._connect_btn = QPushButton("Connect")
         self._connect_btn.clicked.connect(self._on_connect_clicked)
@@ -536,6 +609,11 @@ class MainWindow(QMainWindow):
             port = self._port_combo.currentText()
             if not port or port.startswith("("):
                 return
+            busy = self._ports_in_use()
+            if port in busy:
+                self._status_bar.showMessage(
+                    f"{port} is in use by {busy[port]} — pick another port")
+                return
             self._status_bar.showMessage(f"Checking {port}…")
             detected = device_manager.check_port(port)
             if not detected:
@@ -650,6 +728,7 @@ class MainWindow(QMainWindow):
                 datetime.fromtimestamp(ts).isoformat(timespec="milliseconds"),
                 channels,
                 self._last_bme,
+                extra=(self._last_ext_params or None),
             )
 
     def _on_bme(self, data: dict):
@@ -761,6 +840,21 @@ class MainWindow(QMainWindow):
             self._pyro_curves.clear()
             if self._pyro_legend is not None:
                 self._pyro_legend.clear()
+        # Serial Scripting (if active). Deliberately keep _last_ext_params:
+        # clearing a graph doesn't change device state, and recording rows
+        # must keep carrying the last-known values.
+        if self._ext_serial_buffer is not None:
+            self._ext_serial_buffer.clear()
+        if self._ext_serial_plot is not None:
+            # Curves live in per-param ViewBoxes (BME pattern); the
+            # ViewBoxes/axes themselves persist for reuse.
+            for name, curve in self._ext_serial_curves.items():
+                vb = self._ext_serial_vbs.get(name)
+                if vb is not None:
+                    vb.removeItem(curve)
+            self._ext_serial_curves.clear()
+            if self._ext_serial_legend is not None:
+                self._ext_serial_legend.clear()
 
     # ------------------------------------------------------------------
     # Recording control
@@ -769,6 +863,25 @@ class MainWindow(QMainWindow):
     def _on_record_start(self):
         filename = self._filename_edit.text().strip() or "DATA"
         mode = "flash" if self._mode_flash.isChecked() else "ambient"
+
+        # Serial Scripting: freeze the extra param columns for this file.
+        # Names come from a scan of the running script's source snapshot
+        # (or the editor text) plus any params already set this session, so
+        # the very first row carries the current state.
+        extra_cols: list[str] = []
+        if self._ext_serial_panel is not None:
+            from ext_serial_script import scan_param_names
+            code = None
+            if (self._ext_serial_runner is not None
+                    and self._ext_serial_runner.isRunning()):
+                code = self._ext_serial_runner.source_code
+            if not code:
+                code = self._ext_serial_panel.script_text()
+            extra_cols = list(dict.fromkeys(
+                scan_param_names(code) + list(self._last_ext_params.keys())))
+        self._ext_extra_cols = extra_cols
+        self._ext_missing_warned.clear()
+
         path = self._recorder.start_recording(
             filename=filename,
             model=self._model,
@@ -778,6 +891,7 @@ class MainWindow(QMainWindow):
             astep=self._astep_spin.value(),
             led=self._led_spin.value(),
             spec_channels=protocol.channels_for_model(self._model),
+            extra_cols=extra_cols or None,
         )
         self._record_btn.setEnabled(False)
         self._stop_rec_btn.setEnabled(True)
@@ -788,10 +902,23 @@ class MainWindow(QMainWindow):
                 and self._pyro_worker.isRunning()):
             self._open_pyro_recorder_lazy()
 
+        # Serial Scripting: open the event-log sidecar when the feature has
+        # anything to log (live port, running script, or pre-set params).
+        if self._ext_serial_panel is not None and (
+                (self._ext_serial_worker is not None
+                 and self._ext_serial_worker.isRunning())
+                or (self._ext_serial_runner is not None
+                    and self._ext_serial_runner.isRunning())
+                or self._last_ext_params):
+            self._open_ext_serial_recorder_lazy()
+
     def _on_record_stop(self):
         self._recorder.stop_recording()
         if self._pyro_recorder is not None and self._pyro_recorder.is_recording:
             self._pyro_recorder.stop_recording()
+        if (self._ext_serial_recorder is not None
+                and self._ext_serial_recorder.is_recording):
+            self._ext_serial_recorder.stop_recording()
         self._record_btn.setEnabled(self._running)
         self._stop_rec_btn.setEnabled(False)
         self._status_bar.showMessage("Recording stopped")
@@ -831,14 +958,51 @@ class MainWindow(QMainWindow):
             vb.enableAutoRange(axis='y')
         if self._pyro_plot is not None:
             self._pyro_plot.enableAutoRange(axis='y')
+        if self._ext_serial_plot is not None:
+            for vb in (self._ext_serial_vbs.values()
+                       or [self._ext_serial_plot.getViewBox()]):
+                vb.enableAutoRange(axis='y')
 
     def _on_x_fit(self):
-        """Auto-fit horizontal axis only (keep vertical range)."""
-        self._spec_plot.enableAutoRange(axis='x')
-        for vb in self._bme_vbs.values():
-            vb.enableAutoRange(axis='x')
-        if self._pyro_plot is not None:
-            self._pyro_plot.enableAutoRange(axis='x')
+        """Fit the x-axis so ALL plots show the same wall-clock window.
+
+        Each pane plots against its own t0, so a plain per-plot x-autorange
+        never lines the panes up in time; here the union of all data spans
+        is applied to every pane in its local coordinates."""
+        now = time.time()
+        panes = []   # (main ViewBox, its wall-clock t0)
+        spans = []   # (wall_start, wall_end) of that pane's data
+        if len(self._spec_buffer):
+            t = self._spec_buffer.times()
+            panes.append((self._spec_plot.getViewBox(), t[0]))
+            spans.append((t[0], t[-1]))
+        if len(self._bme_buffer):
+            t = self._bme_buffer.times()
+            panes.append((self._bme_plot.getViewBox(), t[0]))
+            spans.append((t[0], t[-1]))
+        if (self._pyro_plot is not None and self._pyro_buffer is not None
+                and len(self._pyro_buffer)):
+            t = self._pyro_buffer.times()
+            panes.append((self._pyro_plot.getViewBox(), t[0]))
+            spans.append((t[0], t[-1]))
+        if (self._ext_serial_plot is not None
+                and self._ext_serial_buffer is not None
+                and len(self._ext_serial_buffer)):
+            t0 = self._ext_serial_buffer.t0()
+            panes.append((self._ext_serial_plot.getViewBox(), t0))
+            spans.append((t0, now))    # step curves hold-extend to "now"
+        if not panes:
+            self._spec_plot.enableAutoRange(axis='x')
+            return
+        start = min(s for s, _ in spans)
+        end = max(e for _, e in spans)
+        if end <= start:
+            end = start + 1.0
+        # Freeze live auto-range so the aligned window sticks; Reset View
+        # returns to live auto-scaling. (Overlay ViewBoxes follow via XLink.)
+        self._auto_range = False
+        for vb, t0 in panes:
+            vb.setXRange(start - t0, end - t0, padding=0.02)
 
     def _on_reset_view(self):
         """Reset to full auto-scale on both axes, re-enable live auto-range."""
@@ -848,6 +1012,10 @@ class MainWindow(QMainWindow):
             vb.enableAutoRange()
         if self._pyro_plot is not None:
             self._pyro_plot.enableAutoRange()
+        if self._ext_serial_plot is not None:
+            for vb in (self._ext_serial_vbs.values()
+                       or [self._ext_serial_plot.getViewBox()]):
+                vb.enableAutoRange()
 
     def _on_toggle_time_axis(self):
         """Toggle x-axis between elapsed seconds and HH:MM:SS."""
@@ -858,20 +1026,27 @@ class MainWindow(QMainWindow):
             self._bme_plot.setLabel("bottom", "Timestamp")
             if self._pyro_plot is not None:
                 self._pyro_plot.setLabel("bottom", "Timestamp")
+            if self._ext_serial_plot is not None:
+                self._ext_serial_plot.setLabel("bottom", "Timestamp")
         else:
             self._time_toggle_btn.setText("Time (s)")
             self._spec_plot.setLabel("bottom", "Time", units="s")
             self._bme_plot.setLabel("bottom", "Time", units="s")
             if self._pyro_plot is not None:
                 self._pyro_plot.setLabel("bottom", "Time", units="s")
+            if self._ext_serial_plot is not None:
+                self._ext_serial_plot.setLabel("bottom", "Time", units="s")
         self._spec_time_axis.set_timestamp_mode(self._show_timestamp)
         self._bme_time_axis.set_timestamp_mode(self._show_timestamp)
         if self._pyro_time_axis is not None:
             self._pyro_time_axis.set_timestamp_mode(self._show_timestamp)
+        if self._ext_serial_time_axis is not None:
+            self._ext_serial_time_axis.set_timestamp_mode(self._show_timestamp)
         # Force redraw
         self._update_spec_plot()
         self._update_bme_plot()
         self._update_pyro_plot()
+        self._update_ext_serial_plot()
 
     def _on_reset_defaults(self):
         """Reset spectrometer settings to model defaults."""
@@ -988,6 +1163,12 @@ class MainWindow(QMainWindow):
         self._pyro_toggle_action.setChecked(self._pyro_enabled)
         self._pyro_toggle_action.toggled.connect(self._toggle_pyroscience)
         view_menu.addAction(self._pyro_toggle_action)
+
+        self._ext_serial_toggle_action = QAction("Enable Serial Scripting", self)
+        self._ext_serial_toggle_action.setCheckable(True)
+        self._ext_serial_toggle_action.setChecked(self._ext_serial_enabled)
+        self._ext_serial_toggle_action.toggled.connect(self._toggle_ext_serial)
+        view_menu.addAction(self._ext_serial_toggle_action)
 
     def _toggle_li_control(self, enabled: bool) -> None:
         self._li_enabled = enabled
@@ -1311,7 +1492,7 @@ class MainWindow(QMainWindow):
             self._pyro_panel.setVisible(True)
             if self._pyro_plot is not None:
                 self._pyro_plot.setVisible(True)
-                self._right_splitter.setSizes([320, 240, 240])
+                self._rebalance_right_splitter()
         else:
             # Disconnect first if a session is live, then hide
             if self._pyro_worker is not None and self._pyro_worker.isRunning():
@@ -1322,7 +1503,7 @@ class MainWindow(QMainWindow):
                 self._pyro_panel.setVisible(False)
             if self._pyro_plot is not None:
                 self._pyro_plot.setVisible(False)
-                self._right_splitter.setSizes([400, 300, 0])
+                self._rebalance_right_splitter()
 
     def _init_pyroscience(self) -> None:
         # Lazy imports so a broken install doesn't keep the GUI from launching
@@ -1355,10 +1536,10 @@ class MainWindow(QMainWindow):
             self._pyro_plot.getViewBox().sigRangeChangedManually.connect(
                 self._on_manual_zoom)
             self._right_splitter.addWidget(self._pyro_plot)
-            self._right_splitter.setSizes([320, 240, 240])
+            self._rebalance_right_splitter()
 
         # Left-panel widget
-        panel = PyroPanel()
+        panel = PyroPanel(busy_ports_provider=self._ports_in_use)
         panel.connect_requested.connect(self._on_pyro_connect)
         panel.disconnect_requested.connect(self._on_pyro_disconnect)
         insert_at = self._left_layout.count() - 1   # before trailing addStretch
@@ -1369,6 +1550,14 @@ class MainWindow(QMainWindow):
 
     def _on_pyro_connect(self, port: str, channel: int, interval_s: float) -> None:
         if self._pyro_worker is not None and self._pyro_worker.isRunning():
+            return
+        busy = self._ports_in_use()
+        if port in busy:
+            # Guard against opening another feature's device — PyroWorker
+            # opens with DTR/RTS asserted and would reset an ESP32 board.
+            if self._pyro_panel is not None:
+                self._pyro_panel.on_error(
+                    f"{port} is in use by {busy[port]} — pick another port")
             return
         try:
             from pyro_worker import PyroWorker
@@ -1506,10 +1695,648 @@ class MainWindow(QMainWindow):
             self._status_bar.showMessage(f"Pyroscience record failed: {exc}")
 
     # ------------------------------------------------------------------
+    # Serial Scripting: optional feature
+    # ------------------------------------------------------------------
+
+    def _rebalance_right_splitter(self) -> None:
+        """Distribute pane heights over the non-hidden plots.
+
+        The spec plot gets 1.5 shares, every other visible pane 1 share.
+        isHidden() (not isVisible()) so this also works during __init__,
+        before the window itself is shown."""
+        total = sum(self._right_splitter.sizes()) or 700
+        widgets = [self._right_splitter.widget(i)
+                   for i in range(self._right_splitter.count())]
+        shares = [
+            0.0 if (w is None or w.isHidden())
+            else (1.5 if w is self._spec_plot else 1.0)
+            for w in widgets
+        ]
+        denom = sum(shares) or 1.0
+        self._right_splitter.setSizes(
+            [int(total * s / denom) for s in shares])
+
+    def _ports_in_use(self) -> dict[str, str]:
+        """Ports currently owned by a running worker → owner name."""
+        busy: dict[str, str] = {}
+        if self._worker is not None and self._worker.isRunning():
+            busy[self._worker.port] = "CO2Dot"
+        if self._pyro_worker is not None and self._pyro_worker.isRunning():
+            busy[self._pyro_worker.port] = "Pyroscience"
+        if (self._ext_serial_worker is not None
+                and self._ext_serial_worker.isRunning()):
+            busy[self._ext_serial_worker.port] = "Serial Scripting"
+        return busy
+
+    # ---- Port autodetect: one button connects CO2Dot + Pyroscience ------
+
+    def _on_port_autodetect(self) -> None:
+        if (self._port_probe_thread is not None
+                and self._port_probe_thread.isRunning()):
+            self._status_bar.showMessage("Port scan already running…")
+            return
+        try:
+            from port_probe import PortProbeThread
+        except ImportError as exc:
+            self._status_bar.showMessage(f"Autodetect unavailable: {exc}")
+            return
+        # Never probe ports that a worker holds open (probing is safe —
+        # DTR/RTS stay low — but an owned port can't be opened anyway).
+        busy = set(self._ports_in_use())
+        ports = [p for p in device_manager.list_ports() if p not in busy]
+        if not ports:
+            self._status_bar.showMessage("Autodetect: no free ports to scan")
+            return
+        self._auto_btn.setEnabled(False)
+        self._port_probe_thread = PortProbeThread(ports, self)
+        self._port_probe_thread.port_checked.connect(
+            self._on_port_probe_progress)
+        self._port_probe_thread.finished_scan.connect(
+            self._on_port_autodetect_done)
+        self._port_probe_thread.start()
+        self._status_bar.showMessage(
+            f"Scanning {len(ports)} port(s) for CO2Dot / Pyroscience…")
+
+    def _on_port_probe_progress(self, port: str, kind: str) -> None:
+        if kind:
+            self._status_bar.showMessage(f"Autodetect: {port} → {kind}")
+        else:
+            self._status_bar.showMessage(f"Autodetect: checked {port}")
+
+    def _on_port_autodetect_done(self, found: dict) -> None:
+        if self._port_probe_thread is not None:
+            self._port_probe_thread.deleteLater()
+            self._port_probe_thread = None
+        self._auto_btn.setEnabled(True)
+        msgs = []
+
+        co2 = found.get("co2dot")
+        if co2:
+            port, device = co2
+            if self._worker is not None and self._worker.isRunning():
+                msgs.append(f"{device} on {port} (already connected)")
+            else:
+                idx = self._port_combo.findText(port)
+                if idx < 0:
+                    self._port_combo.addItem(port)
+                    idx = self._port_combo.findText(port)
+                self._port_combo.setCurrentIndex(idx)
+                self._on_connect_clicked()
+                msgs.append(f"{device} on {port} — connecting")
+
+        pyro = found.get("pyro")
+        if pyro:
+            port, idnr = pyro
+            label = f"Pyroscience on {port}" + (f" (IDNR {idnr})" if idnr else "")
+            if self._pyro_panel is None:
+                msgs.append(label + " — enable the Pyroscience feature to use it")
+            elif (self._pyro_worker is not None
+                    and self._pyro_worker.isRunning()):
+                msgs.append(label + " (already connected)")
+            else:
+                self._pyro_panel.set_port(port)
+                # Reuse the panel's own click path so channel/interval come
+                # from its spin boxes.
+                self._pyro_panel._on_connect_clicked()
+                msgs.append(label + " — connecting")
+
+        amb = found.get("ambyte")
+        if amb:
+            # Deliberately not auto-selected: the user picks the leftover
+            # port in Serial Scripting manually.
+            msgs.append(f"ambyte on {amb} — select it in Serial Scripting")
+
+        self._status_bar.showMessage(
+            "Autodetect: " + ("; ".join(msgs) if msgs else "no devices found"))
+
+    def _toggle_ext_serial(self, enabled: bool) -> None:
+        if (not enabled
+                and self._ext_serial_runner is not None
+                and self._ext_serial_runner.isRunning()):
+            # A running script is an experiment — refuse to tear it down on
+            # a menu mis-click (deliberate divergence from Pyroscience).
+            self._ext_serial_toggle_action.setChecked(True)
+            self._status_bar.showMessage(
+                "Abort the running script before disabling Serial Scripting")
+            return
+        self._ext_serial_enabled = enabled
+        self._gui_cfg["ext_serial_enabled"] = enabled
+        self._save_gui_config()
+        if enabled:
+            if self._ext_serial_panel is None:
+                try:
+                    self._init_ext_serial()
+                except Exception as exc:
+                    self._ext_serial_toggle_action.setChecked(False)
+                    self._status_bar.showMessage(
+                        f"Serial Scripting init failed: {exc}")
+                    return
+            self._ext_serial_panel.setVisible(True)
+            if self._ext_serial_plot is not None:
+                self._ext_serial_plot.setVisible(True)
+            self._rebalance_right_splitter()
+            self._ext_plot_timer.start()
+        else:
+            if (self._ext_serial_worker is not None
+                    and self._ext_serial_worker.isRunning()):
+                self._ext_serial_worker.close_port()
+            if (self._ext_serial_recorder is not None
+                    and self._ext_serial_recorder.is_recording):
+                self._ext_serial_recorder.stop_recording()
+            self._ext_plot_timer.stop()
+            if self._ext_serial_panel is not None:
+                self._ext_serial_panel.setVisible(False)
+            if self._ext_serial_plot is not None:
+                self._ext_serial_plot.setVisible(False)
+            self._rebalance_right_splitter()
+
+    def _init_ext_serial(self) -> None:
+        # Lazy imports so a broken install doesn't keep the GUI from
+        # launching when the feature is disabled.
+        from ext_serial_panel import ExtSerialPanel
+        from ext_serial_buffer import ParamBuffer
+
+        if self._ext_serial_buffer is None:
+            self._ext_serial_buffer = ParamBuffer()
+
+        # Plot pane (created once, inserted into the right splitter)
+        if self._ext_serial_plot is None:
+            self._ext_serial_time_axis = TimeAxisItem(orientation='bottom')
+            self._ext_serial_plot = pg.PlotWidget(
+                title="Serial Script Parameters",
+                axisItems={'bottom': self._ext_serial_time_axis},
+            )
+            self._ext_serial_plot.setLabel("left", "Value")
+            self._ext_serial_plot.setLabel(
+                "bottom",
+                "Timestamp" if self._show_timestamp else "Time",
+                units=None if self._show_timestamp else "s",
+            )
+            self._ext_serial_time_axis.set_timestamp_mode(self._show_timestamp)
+            self._ext_serial_plot.showGrid(x=True, y=True, alpha=0.3)
+            self._ext_serial_legend = self._ext_serial_plot.addLegend(
+                offset=(10, 10))
+            self._ext_serial_plot.getViewBox().sigRangeChangedManually.connect(
+                self._on_manual_zoom)
+            self._ext_serial_plot.getViewBox().sigResized.connect(
+                self._sync_ext_viewboxes)
+            self._right_splitter.addWidget(self._ext_serial_plot)
+            self._rebalance_right_splitter()
+
+        # Left-panel widget
+        panel = ExtSerialPanel(
+            default_script_dir=self._base_dir / "scripts",
+            busy_ports_provider=self._ports_in_use,
+        )
+        saved_script = self._gui_cfg.get("ext_serial_script", "")
+        if saved_script:
+            panel.set_script_text(saved_script)
+        panel.set_port_baud(
+            self._gui_cfg.get("ext_serial_port", ""),
+            int(self._gui_cfg.get("ext_serial_baud", 115200) or 115200),
+        )
+        panel.connect_requested.connect(self._on_ext_serial_connect)
+        panel.disconnect_requested.connect(self._on_ext_serial_disconnect)
+        panel.send_requested.connect(self._on_ext_serial_send)
+        panel.run_requested.connect(self._on_ext_serial_run)
+        panel.abort_requested.connect(self._on_ext_serial_abort)
+        panel.park_requested.connect(self._on_ext_serial_park)
+        insert_at = self._left_layout.count() - 1   # before trailing addStretch
+        self._left_layout.insertWidget(insert_at, panel)
+        self._ext_serial_panel = panel
+        self._ext_plot_timer.start()
+
+    # ---- Connection slots ----------------------------------------------
+
+    def _on_ext_serial_connect(self, port: str, baud: int) -> None:
+        if (self._ext_serial_worker is not None
+                and self._ext_serial_worker.isRunning()):
+            return
+        busy = self._ports_in_use()
+        if port in busy:
+            if self._ext_serial_panel is not None:
+                self._ext_serial_panel.on_error(
+                    f"{port} is in use by {busy[port]} — pick another port")
+            return
+        try:
+            from ext_serial_worker import ExtSerialWorker
+        except ImportError as exc:
+            self._status_bar.showMessage(
+                f"Serial Scripting: pyserial missing ({exc})")
+            return
+        if self._ext_serial_worker is None:
+            self._ext_serial_worker = ExtSerialWorker(self)
+            self._ext_serial_worker.connected.connect(
+                self._on_ext_serial_connected)
+            self._ext_serial_worker.disconnected.connect(
+                self._on_ext_serial_disconnected)
+            self._ext_serial_worker.line_sent.connect(
+                self._on_ext_serial_line_sent)
+            self._ext_serial_worker.line_received.connect(
+                self._on_ext_serial_line)
+            self._ext_serial_worker.error_received.connect(
+                self._on_ext_serial_error)
+        self._ext_serial_worker.open_port(port, baud)
+        self._status_bar.showMessage(f"Serial Scripting: connecting to {port}…")
+
+    def _on_ext_serial_disconnect(self) -> None:
+        if (self._ext_serial_worker is not None
+                and self._ext_serial_worker.isRunning()):
+            self._ext_serial_worker.close_port()
+
+    def _on_ext_serial_connected(self, info: dict) -> None:
+        self._ext_wrong_port_hinted = False   # fresh port, fresh hint
+        if self._ext_serial_panel is not None:
+            self._ext_serial_panel.on_connected(info)
+        self._gui_cfg["ext_serial_port"] = info.get("port", "")
+        self._gui_cfg["ext_serial_baud"] = int(info.get("baud", 115200))
+        self._save_gui_config()
+        self._log_ext_event(
+            "connect", detail=f"{info.get('port', '')} @ {info.get('baud', '')}")
+        self._status_bar.showMessage(
+            f"Serial Scripting connected: {info.get('port', '')}")
+
+    def _on_ext_serial_disconnected(self) -> None:
+        # Deliberately no auto-abort: an AD3-only script may keep running;
+        # a serial script fails loudly at its next send().
+        if self._ext_serial_panel is not None:
+            self._ext_serial_panel.on_disconnected()
+        self._log_ext_event("disconnect")
+        self._status_bar.showMessage("Serial Scripting disconnected")
+
+    def _on_ext_serial_error(self, msg: str) -> None:
+        if self._ext_serial_panel is not None:
+            self._ext_serial_panel.on_error(msg)
+        self._status_bar.showMessage(msg)
+
+    # ---- Console / manual command slots ----------------------------------
+
+    def _on_ext_serial_send(self, cmd: str) -> None:
+        # Script-helper calls typed in the console (dc_offset(0.05),
+        # pwm(10), param('x', 1), …) run through the script engine — they
+        # act on the PC/AD3 side, not on the serial device.
+        if EXT_HELPER_RE.match(cmd):
+            self._run_ext_console_command(cmd)
+            return
+        if (self._ext_serial_worker is None
+                or not self._ext_serial_worker.isRunning()):
+            if self._ext_serial_panel is not None:
+                self._ext_serial_panel.append_console("not connected")
+            return
+        try:
+            self._ext_serial_worker.send_command(cmd)
+        except RuntimeError as exc:
+            if self._ext_serial_panel is not None:
+                self._ext_serial_panel.append_console(f"send failed: {exc}")
+            return
+        self._log_ext_event("manual_command", detail=cmd)
+
+    def _run_ext_console_command(self, code: str) -> None:
+        """Execute one console line as a mini script (own runner, so it
+        never disturbs the Run/Abort state of the main script)."""
+        from ext_serial_script import ScriptRunner
+        if (self._ext_console_runner is not None
+                and self._ext_console_runner.isRunning()):
+            self._on_ext_serial_info("previous console command still running")
+            return
+        if self._ext_console_runner is not None:
+            self._ext_console_runner.deleteLater()
+            self._ext_console_runner = None
+        runner = ScriptRunner(lambda: self._ext_serial_worker, parent=self)
+        runner.param_set.connect(self._on_ext_serial_param)
+        runner.info.connect(self._on_ext_serial_info)
+        runner.finished_run.connect(self._on_ext_console_finished)
+        self._ext_console_runner = runner
+        self._on_ext_serial_info(code)   # echo what is being executed
+        self._log_ext_event("manual_command", detail=code)
+        try:
+            runner.run_script(code)
+        except SyntaxError as exc:
+            self._ext_console_runner = None
+            runner.deleteLater()
+            if self._ext_serial_panel is not None:
+                self._ext_serial_panel.append_console(f"syntax error: {exc}")
+
+    def _on_ext_console_finished(self, ok: bool, msg: str) -> None:
+        if ok or self._ext_serial_panel is None:
+            return
+        for ln in msg.splitlines():
+            self._ext_serial_panel.append_console(ln)
+
+    def _on_ext_serial_line_sent(self, ts: float, cmd: str) -> None:
+        if self._ext_serial_panel is not None:
+            self._ext_serial_panel.append_console(
+                f"{datetime.fromtimestamp(ts).strftime('%H:%M:%S')} → {cmd}")
+        self._log_ext_event("command", detail=cmd, ts=ts)
+
+    def _on_ext_serial_line(self, ts: float, text: str) -> None:
+        if self._ext_serial_panel is not None:
+            self._ext_serial_panel.append_console(
+                f"{datetime.fromtimestamp(ts).strftime('%H:%M:%S')} ← {text}")
+            # '#ERRO'/'#IDNR' replies are PyroScience protocol — the classic
+            # wrong-port mistake when the optode shares the USB hub.
+            if text.startswith("#") and not self._ext_wrong_port_hinted:
+                self._ext_wrong_port_hinted = True
+                self._ext_serial_panel.append_console(
+                    "⚠ '#…' replies are PyroScience protocol — this looks "
+                    "like the O2 optode, not the ESP32. Check the port.")
+        self._log_ext_event("reply", detail=text, ts=ts)
+
+    # ---- Script slots -----------------------------------------------------
+
+    def _on_ext_serial_run(self, code: str) -> None:
+        if (self._ext_serial_runner is not None
+                and self._ext_serial_runner.isRunning()):
+            self._status_bar.showMessage(
+                "Serial Scripting: a script is already running")
+            return
+        # Persist the script so an app crash can't lose it.
+        self._gui_cfg["ext_serial_script"] = code
+        self._save_gui_config()
+
+        from ext_serial_script import ScriptRunner
+
+        # Fresh runner per run; the old one has finished and is safe to drop.
+        if self._ext_serial_runner is not None:
+            try:
+                self._ext_serial_runner.started_run.disconnect()
+                self._ext_serial_runner.finished_run.disconnect()
+                self._ext_serial_runner.param_set.disconnect()
+                self._ext_serial_runner.info.disconnect()
+                self._ext_serial_runner.finished.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+            self._ext_serial_runner.deleteLater()
+            self._ext_serial_runner = None
+
+        runner = ScriptRunner(lambda: self._ext_serial_worker, parent=self)
+        runner.started_run.connect(self._on_ext_serial_script_started)
+        runner.finished_run.connect(self._on_ext_serial_script_finished)
+        runner.param_set.connect(self._on_ext_serial_param)
+        runner.info.connect(self._on_ext_serial_info)
+        # Safety net: unlock the panel even if finished_run was lost.
+        runner.finished.connect(self._on_ext_serial_thread_finished)
+        self._ext_serial_runner = runner
+        try:
+            runner.run_script(code)   # compiles first, on this thread
+        except SyntaxError as exc:
+            self._ext_serial_runner = None
+            runner.deleteLater()
+            if self._ext_serial_panel is not None:
+                self._ext_serial_panel.append_console(f"syntax error: {exc}")
+            self._status_bar.showMessage(f"Script syntax error: {exc}")
+        # NOTE: the main acquisition timer is deliberately left running —
+        # watching the spectrometer respond to the script is the point.
+
+    def _on_ext_serial_abort(self) -> None:
+        runner = self._ext_serial_runner
+        if runner is None or not runner.isRunning():
+            return
+        runner.abort()
+        # Escalate to an async exception only if the script is still alive
+        # after a grace period, so `finally:` cleanup isn't interrupted in
+        # the normal wait()-dominated case.
+        QTimer.singleShot(
+            1500,
+            lambda r=runner: r.force_abort() if r.isRunning() else None,
+        )
+        self._status_bar.showMessage("Aborting script…")
+
+    def _on_ext_serial_script_started(self) -> None:
+        if self._ext_serial_panel is not None:
+            self._ext_serial_panel.on_script_started()
+        self._log_ext_event("script_start")
+        self._status_bar.showMessage("Serial script running…")
+
+    def _on_ext_serial_script_finished(self, ok: bool, msg: str) -> None:
+        if self._ext_serial_panel is not None:
+            self._ext_serial_panel.on_script_finished()
+        if ok:
+            event = "script_end"
+            self._status_bar.showMessage("Serial script finished")
+        elif msg == "aborted by user":
+            event = "script_abort"
+            self._status_bar.showMessage(
+                self._ext_state_message("Serial script aborted"))
+        else:
+            event = "script_error"
+            if self._ext_serial_panel is not None:
+                for ln in msg.splitlines():
+                    self._ext_serial_panel.append_console(ln)
+            self._status_bar.showMessage(
+                self._ext_state_message("Serial script ended with error"))
+        self._log_ext_event(event, detail=msg)
+
+    def _on_ext_serial_thread_finished(self) -> None:
+        if self._ext_serial_panel is not None:
+            self._ext_serial_panel.on_script_finished()
+
+    def _ext_state_message(self, prefix: str) -> str:
+        """Append the last-known param state so nobody misses a stuck ON."""
+        if self._last_ext_params:
+            state = ", ".join(
+                f"{k}={v:g}" for k, v in self._last_ext_params.items())
+            return f"{prefix} — last state: {state}"
+        return prefix
+
+    def _on_ext_serial_info(self, text: str) -> None:
+        if self._ext_serial_panel is not None:
+            self._ext_serial_panel.append_console(f"· {text}")
+
+    def _on_ext_serial_param(self, ts: float, name: str, value: float) -> None:
+        self._last_ext_params[name] = value
+        if self._ext_serial_buffer is not None:
+            self._ext_serial_buffer.append(ts, name, value)
+        self._update_ext_serial_plot()
+        self._log_ext_event("param", name=name, value=value, ts=ts)
+        if (self._recorder.is_recording
+                and name not in self._ext_extra_cols
+                and name not in self._ext_missing_warned):
+            self._ext_missing_warned.add(name)
+            self._status_bar.showMessage(
+                f"param '{name}' not in record header — kept in the "
+                "_serial.txt log and plot only")
+
+    def _on_ext_serial_park(self) -> None:
+        """Emergency knob: PWM 0 + AD3 to 0 V, recorded as real state."""
+        parked = []
+        if (self._ext_serial_worker is not None
+                and self._ext_serial_worker.isRunning()):
+            try:
+                self._ext_serial_worker.send_command("PWM 0")
+                self._on_ext_serial_param(time.time(), "pwm", 0.0)
+                parked.append("PWM 0")
+            except RuntimeError:
+                pass
+        if "ad3" in sys.modules and sys.modules["ad3"].is_open():
+            try:
+                sys.modules["ad3"].park()
+                self._on_ext_serial_param(time.time(), "led_V", 0.0)
+                parked.append("AD3 0 V")
+            except Exception as exc:
+                self._status_bar.showMessage(f"AD3 park failed: {exc}")
+        if parked:
+            self._log_ext_event("manual_command",
+                                detail="park: " + ", ".join(parked))
+            self._status_bar.showMessage("Outputs parked: " + ", ".join(parked))
+        else:
+            self._status_bar.showMessage(
+                "Nothing to park (no serial connection, AD3 not in use)")
+
+    # ---- Plot update ------------------------------------------------------
+
+    def _ensure_ext_param_viewbox(self, name: str, color: str) -> pg.ViewBox:
+        """One independent y-axis + ViewBox per param (BME plot pattern) —
+        params differ wildly in scale, a shared axis flattens the small ones."""
+        if name in self._ext_serial_vbs:
+            return self._ext_serial_vbs[name]
+        main_vb = self._ext_serial_plot.getViewBox()
+        if not self._ext_serial_vbs:
+            # First param uses the built-in left axis and main ViewBox
+            self._ext_serial_plot.setLabel("left", name, color=color)
+            self._ext_serial_axes[name] = self._ext_serial_plot.getAxis("left")
+            self._ext_serial_vbs[name] = main_vb
+            return main_vb
+        ax = pg.AxisItem("right")
+        ax.setLabel(name, color=color)
+        vb = pg.ViewBox()
+        self._ext_serial_plot.scene().addItem(vb)
+        ax.linkToView(vb)
+        vb.setXLink(main_vb)
+        col = 2 + len(self._ext_serial_vbs)   # first right axis lands at col 3
+        self._ext_serial_plot.plotItem.layout.addItem(ax, 2, col)
+        self._ext_serial_axes[name] = ax
+        self._ext_serial_vbs[name] = vb
+        return vb
+
+    def _sync_ext_viewboxes(self) -> None:
+        """Keep overlay ViewBoxes geometry in sync with the main ViewBox."""
+        if self._ext_serial_plot is None:
+            return
+        main_vb = self._ext_serial_plot.getViewBox()
+        rect = main_vb.sceneBoundingRect()
+        if rect.width() == 0 or rect.height() == 0:
+            return
+        for vb in self._ext_serial_vbs.values():
+            if vb is not main_vb:
+                vb.setGeometry(rect)
+
+    def _update_ext_serial_plot(self) -> None:
+        if (self._ext_serial_buffer is None
+                or self._ext_serial_plot is None
+                or len(self._ext_serial_buffer) == 0):
+            return
+
+        t0 = self._ext_serial_buffer.t0()
+        if self._ext_serial_time_axis is not None:
+            self._ext_serial_time_axis.set_t0(t0)
+        now = time.time()
+
+        for i, name in enumerate(self._ext_serial_buffer.names()):
+            t, v = self._ext_serial_buffer.series(name)
+            if len(t) == 0:
+                continue
+            if name not in self._ext_serial_curves:
+                color = EXT_SERIAL_COLORS[i % len(EXT_SERIAL_COLORS)]
+                vb = self._ensure_ext_param_viewbox(name, color)
+                pen = pg.mkPen(color=color, width=1.5)
+                curve = pg.PlotDataItem(pen=pen, name=name, stepMode="right")
+                vb.addItem(curve)
+                self._ext_serial_legend.addItem(curve, name)
+                self._ext_serial_curves[name] = curve
+                self._connect_legend_toggle(self._ext_serial_legend, curve)
+            # Hold each level to "now" with a synthetic end point (never
+            # stored in the buffer) so the step curve reads correctly.
+            x = np.append(t, now) - t0
+            y = np.append(v, v[-1])
+            self._ext_serial_curves[name].setData(x, y)
+
+        # Overlay ViewBoxes need their geometry set on first data / resize
+        self._sync_ext_viewboxes()
+
+        if self._auto_range:
+            for vb in self._ext_serial_vbs.values():
+                vb.enableAutoRange()
+
+    # ---- Recorder helpers --------------------------------------------------
+
+    def _log_ext_event(self, event: str, name: str = "", value=None,
+                       detail: str = "", ts: float | None = None) -> None:
+        """Sidecar event log; mirrors the main recording (pyro convention).
+        Outside a recording, events reach the console only."""
+        if not self._recorder.is_recording:
+            return
+        if (self._ext_serial_recorder is None
+                or not self._ext_serial_recorder.is_recording):
+            self._open_ext_serial_recorder_lazy()
+        if (self._ext_serial_recorder is None
+                or not self._ext_serial_recorder.is_recording):
+            return
+        stamp = datetime.fromtimestamp(
+            ts if ts is not None else time.time()
+        ).isoformat(timespec="milliseconds")
+        self._ext_serial_recorder.log_event(
+            stamp, event, name=name, value=value, detail=detail)
+
+    def _open_ext_serial_recorder_lazy(self) -> None:
+        from ext_serial_recorder import ExtSerialRecorder
+        if self._ext_serial_recorder is None:
+            self._ext_serial_recorder = ExtSerialRecorder(self._base_dir / "data")
+        if self._ext_serial_recorder.is_recording:
+            return
+        try:
+            filename = self._filename_edit.text().strip() or "DATA"
+            path = self._ext_serial_recorder.start_recording(filename=filename)
+            self._status_bar.showMessage(f"Serial event log → {path.name}")
+        except OSError as exc:
+            self._status_bar.showMessage(f"Serial event log failed: {exc}")
+            return
+        # Opening snapshot: current param state, so a recording started
+        # mid-script has full context from its first row.
+        now = datetime.fromtimestamp(time.time()).isoformat(
+            timespec="milliseconds")
+        for pname, pval in self._last_ext_params.items():
+            self._ext_serial_recorder.log_event(
+                now, "param", name=pname, value=pval,
+                detail="snapshot at record start")
+
+    # ------------------------------------------------------------------
     # Close
     # ------------------------------------------------------------------
 
     def closeEvent(self, event):
+        # Serial-script confirmation first — if the user cancels, nothing
+        # may have been torn down yet.
+        if (self._ext_serial_runner is not None
+                and self._ext_serial_runner.isRunning()):
+            resp = QMessageBox.question(
+                self, "Script running",
+                "A serial script is running — abort it and exit?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if resp != QMessageBox.Yes:
+                event.ignore()
+                return
+            try:
+                self._ext_serial_runner.abort()
+                if not self._ext_serial_runner.wait(1500):
+                    # Still alive: escalate, but NEVER terminate() exec'd
+                    # Python — if it survives this too, keep the thread
+                    # object referenced and let process teardown handle it.
+                    self._ext_serial_runner.force_abort()
+                    self._ext_serial_runner.wait(1500)
+            except Exception:
+                pass
+        if (self._port_probe_thread is not None
+                and self._port_probe_thread.isRunning()):
+            # Probe sweeps are short (~1 s/port); let the current one finish.
+            self._port_probe_thread.wait(2000)
+        if (self._ext_console_runner is not None
+                and self._ext_console_runner.isRunning()):
+            try:
+                self._ext_console_runner.abort()
+                self._ext_console_runner.wait(500)
+            except Exception:
+                pass
         if self._recorder.is_recording:
             self._recorder.stop_recording()
         if self._li_runner is not None:
@@ -1536,6 +2363,32 @@ class MainWindow(QMainWindow):
                 pass
         if self._pyro_recorder is not None and self._pyro_recorder.is_recording:
             self._pyro_recorder.stop_recording()
+        if (self._ext_serial_worker is not None
+                and self._ext_serial_worker.isRunning()):
+            try:
+                self._ext_serial_worker.close_port()
+            except Exception:
+                pass
+        if (self._ext_serial_recorder is not None
+                and self._ext_serial_recorder.is_recording):
+            self._ext_serial_recorder.stop_recording()
+        if self._ext_serial_panel is not None:
+            # Persist the script text and connection settings.
+            self._gui_cfg["ext_serial_script"] = \
+                self._ext_serial_panel.script_text()
+            port = self._ext_serial_panel.current_port()
+            if port:
+                self._gui_cfg["ext_serial_port"] = port
+            self._gui_cfg["ext_serial_baud"] = \
+                self._ext_serial_panel.current_baud()
+            self._save_gui_config()
+        if "ad3" in sys.modules:
+            # Park the LED at 0 V and release the AD3. Never import ad3
+            # here — only act if a script already loaded it.
+            try:
+                sys.modules["ad3"].close()
+            except Exception:
+                pass
         if self._worker and self._worker.isRunning():
             self._worker.close_port()
         super().closeEvent(event)

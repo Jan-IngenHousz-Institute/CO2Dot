@@ -19,6 +19,12 @@ def list_ports() -> list[str]:
     return [p.device for p in serial.tools.list_ports.comports()]
 
 
+def list_ports_info() -> list[tuple[str, str]]:
+    """Return (device, description) tuples for all serial ports."""
+    return [(p.device, p.description or "")
+            for p in serial.tools.list_ports.comports()]
+
+
 def check_port(port: str) -> str | None:
     """
     Try opening `port` at 115200 baud, send 'hello', and check for a

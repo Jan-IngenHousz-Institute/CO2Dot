@@ -1,4 +1,8 @@
 {
   "li_control_enabled": false,
-  "pyroscience_enabled": false
+  "pyroscience_enabled": false,
+  "ext_serial_enabled": true,
+  "ext_serial_port": "COM20",
+  "ext_serial_baud": 115200,
+  "ext_serial_script": "# Serial script \u2014 helpers:\n#   send(cmd)            raw serial command\n#   wait(s)              abort-interruptible sleep (time.sleep works too)\n#   param(name, value)   record/plot a named value\n#   pwm(v)               send('PWM v') + param('pwm', v)\n#   dc_offset(V)         AD3 LED drive, clamped 0..0.3 V + param('led_V', V)\n# Abort stops wait() immediately; `finally:` still runs \u2014 park outputs there.\ntry:\n    for led_V in [0.15, 0]:\n        dc_offset(led_V)\n        pwm(100)\n        wait(60*10)\n        for rep in range(4):\n            pwm(0)\n            wait(60)\n            pwm(100)\n            wait(5*60)\nfinally:\n    pwm(0)\n    dc_offset(0)\n"
 }

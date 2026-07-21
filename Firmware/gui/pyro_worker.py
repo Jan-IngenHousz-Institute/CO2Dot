@@ -41,6 +41,10 @@ class PyroWorker(QThread):
         self._abort = threading.Event()
         self._streaming = threading.Event()  # gate around MEA polling
 
+    @property
+    def port(self) -> str:
+        return self._port
+
     # ---- Public API (main thread) -------------------------------------
     def open_port(self, port: str, channel: int = 1, interval_s: float = 1.0) -> None:
         """Open the port and IDNR-verify. Does NOT begin polling — call
@@ -139,23 +143,29 @@ class PyroWorker(QThread):
 
     # ---- Helpers ------------------------------------------------------
     def _do_idnr(self) -> str | None:
-        try:
-            self._ser.write(pyro_protocol.CMD_IDNR)
-        except (serial.SerialException, OSError) as exc:
-            self.error_received.emit(f"Pyro: write IDNR failed: {exc}")
-            return None
-        deadline = time.monotonic() + IDNR_TIMEOUT_S
-        while time.monotonic() < deadline and not self._abort.is_set():
+        # Two attempts: if another program left an unterminated command in
+        # the device's input buffer, the first '#IDNR\r' merely flushes that
+        # garbage (the device answers #ERRO); the retry gets a clean answer.
+        for _ in range(2):
             try:
-                raw = self._ser.readline()
+                self._ser.write(pyro_protocol.CMD_IDNR)
             except (serial.SerialException, OSError) as exc:
-                self.error_received.emit(f"Pyro: read IDNR failed: {exc}")
+                self.error_received.emit(f"Pyro: write IDNR failed: {exc}")
                 return None
-            if not raw:
-                continue
-            line = raw.decode("utf-8", errors="replace")
-            if pyro_protocol.is_idnr_response(line):
-                return pyro_protocol.extract_idnr(line)
+            deadline = time.monotonic() + IDNR_TIMEOUT_S
+            while time.monotonic() < deadline and not self._abort.is_set():
+                try:
+                    raw = self._ser.readline()
+                except (serial.SerialException, OSError) as exc:
+                    self.error_received.emit(f"Pyro: read IDNR failed: {exc}")
+                    return None
+                if not raw:
+                    continue
+                line = raw.decode("utf-8", errors="replace")
+                if pyro_protocol.is_idnr_response(line):
+                    return pyro_protocol.extract_idnr(line)
+            if self._abort.is_set():
+                break
         self.error_received.emit(f"Pyro: no IDNR response from {self._port}")
         return None
 
