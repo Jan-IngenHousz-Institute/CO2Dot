@@ -22,6 +22,18 @@ class Recorder:
     def is_recording(self) -> bool:
         return self._recording
 
+    @property
+    def data_dir(self) -> Path:
+        return self._data_dir
+
+    @data_dir.setter
+    def data_dir(self, value: str | Path) -> None:
+        """Ignored mid-recording: an open file keeps the directory it was
+        created in, so the whole file stays in one place."""
+        if self._recording:
+            return
+        self._data_dir = Path(value)
+
     def start_recording(
         self,
         filename: str,

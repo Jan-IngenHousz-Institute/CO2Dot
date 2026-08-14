@@ -37,6 +37,17 @@ class LiRecorder:
     def is_recording(self) -> bool:
         return self._recording
 
+    @property
+    def data_dir(self) -> Path:
+        return self._data_dir
+
+    @data_dir.setter
+    def data_dir(self, value: str | Path) -> None:
+        """Ignored mid-recording — see Recorder.data_dir."""
+        if self._recording:
+            return
+        self._data_dir = Path(value)
+
     def start_recording(
         self,
         filename: str,

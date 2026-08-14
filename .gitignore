@@ -19,8 +19,19 @@ build.log
 # CAD
 *.FCBak
 
-# Data files (uncomment to ignore)
-# Firmware/gui/data/
+# GUI recordings — local measurement output, never committed
+Firmware/gui/data/
+
+# GUI runtime state. The committed baseline is gui_config.default.json;
+# these are written by the app and differ per machine.
+Firmware/gui/gui_config.json
+Firmware/gui/gui_config.local.json
+Firmware/gui/scripts/
+
+# PyInstaller output
+Firmware/gui/build/
+Firmware/gui/dist/
+Firmware/gui/selftest.log
 
 .*
 !.gitignore

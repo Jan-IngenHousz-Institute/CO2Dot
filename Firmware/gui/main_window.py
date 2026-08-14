@@ -3,6 +3,7 @@ main_window.py — QMainWindow for the CO2Dot controller GUI.
 """
 
 import json
+import os
 import re
 import sys
 import time
@@ -12,10 +13,11 @@ from pathlib import Path
 import numpy as np
 import pyqtgraph as pg
 
-from PySide6.QtCore import Qt, QStandardPaths, QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QComboBox,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -35,6 +37,7 @@ from PySide6.QtWidgets import (
 )
 
 import device_manager
+import paths
 import protocol
 from data_buffer import BmeBuffer, SpecBuffer
 from recorder import Recorder
@@ -133,12 +136,13 @@ class MainWindow(QMainWindow):
         self._worker: SerialWorker | None = None
         self._spec_buffer = SpecBuffer()
         self._bme_buffer = BmeBuffer()
-        # When frozen by PyInstaller, save next to the .exe; otherwise next to this .py
-        if getattr(sys, "frozen", False):
-            base_dir = Path(sys.executable).parent
-        else:
-            base_dir = Path(__file__).parent
-        self._recorder = Recorder(base_dir / "data")
+        # Settings come first: the data directory is one of them. Recordings
+        # never go next to the executable — see paths.py.
+        self._gui_cfg_path = paths.config_path()
+        self._gui_cfg = self._load_gui_config()
+        self._data_dir_warning = ""    # surfaced once the status bar exists
+        self._data_dir = self._resolve_data_dir()
+        self._recorder = Recorder(self._data_dir)
         self._model = "AS7341"        # updated on status
         self._running = False         # acquisition running
         self._acq_timer = QTimer(self)
@@ -156,7 +160,6 @@ class MainWindow(QMainWindow):
         self._has_bme = False         # True only for devices with BME sensor
 
         # Li-Control state (all lazily created)
-        self._base_dir = base_dir
         self._li_worker = None
         self._li_panel = None
         self._li_runner = None
@@ -164,8 +167,6 @@ class MainWindow(QMainWindow):
         self._li_recorder = None
         self._last_manual_cmd_id: str | None = None
         self._acq_was_running = False
-        self._gui_cfg_path = self._resolve_config_path()
-        self._gui_cfg = self._load_gui_config()
         self._li_enabled = bool(self._gui_cfg.get("li_control_enabled", False))
 
         # Pyroscience state (all lazily created)
@@ -220,6 +221,9 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._refresh_ports()
+        if self._data_dir_warning:
+            self._status_bar.showMessage(self._data_dir_warning)
+        self._prompt_initial_data_dir()
 
     # ------------------------------------------------------------------
     # UI Construction
@@ -240,8 +244,14 @@ class MainWindow(QMainWindow):
         left_scroll.setWidgetResizable(True)
         left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         left_scroll.setFrameShape(QScrollArea.NoFrame)
-        left_scroll.setMinimumWidth(250)
-        left_scroll.setMaximumWidth(700)
+        self._left_scroll = left_scroll
+        # With the horizontal scrollbar off, anything past the viewport edge is
+        # unreachable — the old hard-coded 250/320 pair silently clipped the
+        # "Auto" button. Derive the width from what the panel actually asks
+        # for, plus the vertical scrollbar it grows once optional panels load.
+        left_min = self._left_panel_width_hint()
+        left_scroll.setMinimumWidth(left_min)
+        left_scroll.setMaximumWidth(max(700, left_min))
 
         # Right panel (plots + controls)
         right_panel = self._build_right_panel()
@@ -255,7 +265,8 @@ class MainWindow(QMainWindow):
         h_split.setStretchFactor(1, 1)
         h_split.setCollapsible(0, False)
         h_split.setCollapsible(1, False)
-        h_split.setSizes([320, 960])
+        h_split.setSizes([left_min, max(600, 1280 - left_min)])
+        self._h_split = h_split
         root.addWidget(h_split, stretch=1)
 
         # Status bar
@@ -293,6 +304,37 @@ class MainWindow(QMainWindow):
                 self._ext_serial_toggle_action.setChecked(False)
                 self._status_bar.showMessage(f"Serial Scripting disabled: {exc}")
 
+    def _left_panel_width_hint(self) -> int:
+        """Width the left column needs to show its contents in full.
+
+        The horizontal scrollbar is disabled, so anything past the viewport
+        edge is unreachable rather than scrollable — the width has to be
+        derived from the panel instead of hard-coded."""
+        panel = self._left_scroll.widget()
+        if panel is None:
+            return 250
+        panel.adjustSize()
+        return (panel.sizeHint().width()
+                + self._left_scroll.verticalScrollBar().sizeHint().width()
+                + 2 * self._left_scroll.frameWidth())
+
+    def _refit_left_panel(self) -> None:
+        """Re-widen the left column after an optional panel is inserted.
+
+        Li-Control and Serial Scripting add their groups long after the
+        initial layout pass, and the Serial Scripting editor is the widest
+        thing in the window."""
+        needed = self._left_panel_width_hint()
+        if needed <= self._left_scroll.minimumWidth():
+            return
+        self._left_scroll.setMinimumWidth(needed)
+        self._left_scroll.setMaximumWidth(
+            max(self._left_scroll.maximumWidth(), needed))
+        sizes = self._h_split.sizes()
+        if len(sizes) == 2 and sizes[0] < needed:
+            self._h_split.setSizes(
+                [needed, max(400, sizes[1] - (needed - sizes[0]))])
+
     def _build_left_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
@@ -303,9 +345,17 @@ class MainWindow(QMainWindow):
         grp_conn = QGroupBox("Connection")
         form_conn = QFormLayout(grp_conn)
         form_conn.setLabelAlignment(Qt.AlignLeft)
+        # If the column is ever dragged narrow, wrap the row under its label
+        # rather than clipping the buttons off its right-hand end.
+        form_conn.setRowWrapPolicy(QFormLayout.WrapLongRows)
 
         self._port_combo = QComboBox()
         self._port_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        # A long /dev/tty.usbserial-… name must not inflate the row, and a
+        # short COM3 must not let it collapse.
+        self._port_combo.setMinimumContentsLength(12)
+        self._port_combo.setSizeAdjustPolicy(
+            QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self._refresh_btn = QPushButton("⟳")
         self._refresh_btn.setFixedWidth(28)
         self._refresh_btn.setToolTip("Refresh port list")
@@ -414,7 +464,16 @@ class MainWindow(QMainWindow):
         self._spec_plot.setLabel("left", "Counts")
         self._spec_plot.setLabel("bottom", "Time", units="s")
         self._spec_plot.showGrid(x=True, y=True, alpha=0.3)
-        self._spec_legend = self._spec_plot.addLegend(offset=(10, 10))
+        # 10 rows (AS7341) or 13 (AS7343) at the default text size overflow the
+        # plot's height before reaching Clear/NIR. Two compact columns fit the
+        # full set at the startup pane height.
+        self._spec_legend = self._spec_plot.addLegend(
+            offset=(10, 10),
+            labelTextSize="7pt",
+            verSpacing=-4,
+            colCount=2,
+            brush=pg.mkBrush(30, 30, 46, 180),
+        )
         self._spec_curves: dict[str, pg.PlotDataItem] = {}
 
         self._bme_time_axis = TimeAxisItem(orientation='bottom')
@@ -551,6 +610,8 @@ class MainWindow(QMainWindow):
         self._filename_edit = QLineEdit("DATA")
         self._filename_edit.setMaximumWidth(150)
         self._filename_edit.setPlaceholderText("filename (no ext)")
+        self._filename_edit.setToolTip(
+            f"Recordings are saved to:\n{self._data_dir}")
 
         self._record_btn = QPushButton("⏺  Record")
         self._record_btn.setEnabled(False)
@@ -882,19 +943,32 @@ class MainWindow(QMainWindow):
         self._ext_extra_cols = extra_cols
         self._ext_missing_warned.clear()
 
-        path = self._recorder.start_recording(
-            filename=filename,
-            model=self._model,
-            mode=mode,
-            gain=self._gain,
-            atime=self._atime_spin.value(),
-            astep=self._astep_spin.value(),
-            led=self._led_spin.value(),
-            spec_channels=protocol.channels_for_model(self._model),
-            extra_cols=extra_cols or None,
-        )
+        try:
+            path = self._recorder.start_recording(
+                filename=filename,
+                model=self._model,
+                mode=mode,
+                gain=self._gain,
+                atime=self._atime_spin.value(),
+                astep=self._astep_spin.value(),
+                led=self._led_spin.value(),
+                spec_channels=protocol.channels_for_model(self._model),
+                extra_cols=extra_cols or None,
+            )
+        except (OSError, ValueError) as exc:
+            # A read-only or vanished data directory must not throw out of a
+            # button handler; nothing has been opened, so just report it.
+            self._status_bar.showMessage(f"Record failed: {exc}")
+            QMessageBox.warning(
+                self, "Record failed",
+                f"Cannot write to:\n{self._data_dir}\n\n{exc}\n\n"
+                "Pick another directory under File → Data directory…",
+            )
+            return
+
         self._record_btn.setEnabled(False)
         self._stop_rec_btn.setEnabled(True)
+        self._data_dir_action.setEnabled(False)
         self._status_bar.showMessage(f"Recording → {path.name}")
 
         # If Pyroscience is already streaming, start a parallel pyro file.
@@ -921,6 +995,7 @@ class MainWindow(QMainWindow):
             self._ext_serial_recorder.stop_recording()
         self._record_btn.setEnabled(self._running)
         self._stop_rec_btn.setEnabled(False)
+        self._data_dir_action.setEnabled(not self._any_recording())
         self._status_bar.showMessage("Recording stopped")
 
     # ------------------------------------------------------------------
@@ -1083,7 +1158,7 @@ class MainWindow(QMainWindow):
             if len(vals) != len(t_rel):
                 continue
             if ch not in self._spec_curves:
-                label = protocol.channel_display_name(ch)
+                label = protocol.channel_short_name(ch)
                 pen = pg.mkPen(color=color, width=1.5)
                 curve = self._spec_plot.plot(pen=pen, name=label)
                 self._spec_curves[ch] = curve
@@ -1126,20 +1201,25 @@ class MainWindow(QMainWindow):
                 vb.enableAutoRange()
 
     # ------------------------------------------------------------------
-    # Li-Control: menu, config, init
+    # Settings file: shipped defaults + user state
     # ------------------------------------------------------------------
 
-    def _resolve_config_path(self) -> Path:
-        if getattr(sys, "frozen", False):
-            loc = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
-            return Path(loc) / "co2dot" / "gui_config.json"
-        return self._base_dir / "gui_config.json"
-
-    def _load_gui_config(self) -> dict:
+    @staticmethod
+    def _read_json(path: Path) -> dict:
         try:
-            return json.loads(self._gui_cfg_path.read_text(encoding="utf-8"))
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return {}
+        return data if isinstance(data, dict) else {}
+
+    def _load_gui_config(self) -> dict:
+        """Shipped defaults, overlaid with whatever the user changed.
+
+        Keeping the two apart means a key added to the defaults reaches
+        existing installs instead of silently reading back as missing."""
+        cfg = self._read_json(paths.default_config_path())
+        cfg.update(self._read_json(self._gui_cfg_path))
+        return cfg
 
     def _save_gui_config(self) -> None:
         try:
@@ -1147,10 +1227,116 @@ class MainWindow(QMainWindow):
             self._gui_cfg_path.write_text(
                 json.dumps(self._gui_cfg, indent=2), encoding="utf-8"
             )
-        except OSError:
+        except (OSError, ValueError):
             pass
 
+    # ------------------------------------------------------------------
+    # Data directory
+    # ------------------------------------------------------------------
+
+    def _resolve_data_dir(self) -> Path:
+        """The stored choice if it is still usable, else the default."""
+        stored = str(self._gui_cfg.get("data_dir", "") or "")
+        if stored:
+            chosen = Path(stored).expanduser()
+            if paths.is_writable(chosen):
+                return chosen
+            self._data_dir_warning = (
+                f"Cannot write to {chosen} — using the default directory instead"
+            )
+        return paths.default_data_dir()
+
+    def _apply_data_dir(self, new_dir: Path) -> None:
+        """Point every recorder at `new_dir`; they all share one root."""
+        self._data_dir = new_dir
+        for rec in (self._recorder, self._li_recorder, self._pyro_recorder,
+                    self._ext_serial_recorder):
+            if rec is not None:
+                rec.data_dir = new_dir
+        edit = getattr(self, "_filename_edit", None)
+        if edit is not None:
+            edit.setToolTip(f"Recordings are saved to:\n{new_dir}")
+
+    def _set_data_dir(self, new_dir: Path, persist: bool = True) -> bool:
+        """Validate, apply and remember a new data directory."""
+        if not paths.is_writable(new_dir):
+            QMessageBox.warning(
+                self, "Data directory",
+                f"Cannot write to:\n{new_dir}\n\n"
+                f"Keeping the current directory:\n{self._data_dir}",
+            )
+            return False
+        self._apply_data_dir(new_dir)
+        if persist:
+            self._gui_cfg["data_dir"] = str(new_dir)
+            self._save_gui_config()
+        self._status_bar.showMessage(f"Data directory: {new_dir}")
+        return True
+
+    def _any_recording(self) -> bool:
+        return any(
+            rec is not None and rec.is_recording
+            for rec in (self._recorder, self._li_recorder,
+                        self._pyro_recorder, self._ext_serial_recorder)
+        )
+
+    def _prompt_initial_data_dir(self) -> None:
+        """Ask once, on the first run of an installed build, where data goes.
+
+        Skipped when running from source — gui/data is the obvious answer
+        there — and skipped as soon as an answer has been stored. The
+        environment check keeps the packaged self-test from blocking on a
+        modal dialog in CI."""
+        if (not paths.is_frozen()
+                or self._gui_cfg.get("data_dir")
+                or os.environ.get("CO2DOT_SELFTEST")):
+            return
+
+        default = paths.default_data_dir()
+        box = QMessageBox(self)
+        box.setWindowTitle("Data directory")
+        box.setText(f"CO2Dot will save recordings to:\n\n{default}")
+        box.setInformativeText(
+            "You can change this at any time under File → Data directory…")
+        use_default = box.addButton("Use this folder", QMessageBox.AcceptRole)
+        choose = box.addButton("Choose folder…", QMessageBox.ActionRole)
+        box.setDefaultButton(use_default)
+        box.exec()
+
+        target = default
+        if box.clickedButton() is choose:
+            start = default if default.exists() else Path.home()
+            picked = QFileDialog.getExistingDirectory(
+                self, "Choose data directory", str(start))
+            if picked:
+                target = Path(picked)
+
+        # A rejected choice must still leave us with a working directory.
+        if not self._set_data_dir(target) and target != default:
+            self._set_data_dir(default)
+
+    def _on_choose_data_dir(self) -> None:
+        if self._any_recording():
+            self._status_bar.showMessage(
+                "Stop recording before changing the data directory")
+            return
+        start = self._data_dir if self._data_dir.exists() else paths.user_root()
+        picked = QFileDialog.getExistingDirectory(
+            self, "Choose data directory", str(start))
+        if picked:
+            self._set_data_dir(Path(picked))
+
+    # ------------------------------------------------------------------
+    # Menu
+    # ------------------------------------------------------------------
+
     def _build_menu(self) -> None:
+        file_menu = self.menuBar().addMenu("File")
+        self._data_dir_action = QAction("Data directory…", self)
+        self._data_dir_action.setToolTip("Choose where recordings are saved")
+        self._data_dir_action.triggered.connect(self._on_choose_data_dir)
+        file_menu.addAction(self._data_dir_action)
+
         view_menu = self.menuBar().addMenu("View")
         self._li_toggle_action = QAction("Enable Li-Control", self)
         self._li_toggle_action.setCheckable(True)
@@ -1206,6 +1392,7 @@ class MainWindow(QMainWindow):
         insert_at = self._left_layout.count() - 1  # before the addStretch
         self._left_layout.insertWidget(insert_at, panel)
         self._li_panel = panel
+        self._refit_left_panel()
 
         # Try zeroconf discovery; fall back to plain-mDNS resolver alone.
         try:
@@ -1364,7 +1551,18 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self._status_bar.showMessage(f"Sequence builder unavailable: {exc}")
             return
-        sequences_dir = self._base_dir / "sequences"
+        # The bundled example is read-only inside a frozen build, so seed a
+        # copy into the user area the first time the builder is opened —
+        # otherwise the file dialogs start in a directory that isn't there.
+        sequences_dir = paths.sequences_dir()
+        try:
+            sequences_dir.mkdir(parents=True, exist_ok=True)
+        except (OSError, ValueError):
+            pass    # the file dialog still opens, just not here
+        paths.seed_user_file(
+            f"sequences/{paths.EXAMPLE_SEQUENCE}",
+            sequences_dir / paths.EXAMPLE_SEQUENCE,
+        )
         initial = list(self._li_panel._steps) if self._li_panel is not None else []
         dlg = SequenceEditorDialog(
             steps=initial, default_dir=sequences_dir, parent=self
@@ -1405,7 +1603,7 @@ class MainWindow(QMainWindow):
         else:
             spec_channels = []
 
-        self._li_recorder = LiRecorder(self._base_dir / "data")
+        self._li_recorder = LiRecorder(self._data_dir)
         try:
             path = self._li_recorder.start_recording(
                 filename="DATA",
@@ -1420,6 +1618,8 @@ class MainWindow(QMainWindow):
         except OSError as exc:
             self._status_bar.showMessage(f"Li recorder open failed: {exc}")
             return
+
+        self._data_dir_action.setEnabled(False)
 
         # Pause the main acquisition timer for the duration of the sequence.
         self._acq_was_running = self._acq_timer.isActive()
@@ -1465,6 +1665,7 @@ class MainWindow(QMainWindow):
     def _end_li_sequence(self, message: str) -> None:
         if self._li_recorder is not None:
             self._li_recorder.stop_recording()
+        self._data_dir_action.setEnabled(not self._any_recording())
         if self._acq_was_running:
             interval_ms = INTERVALS[self._interval_combo.currentIndex()][1] * 1000
             self._acq_timer.start(interval_ms)
@@ -1545,6 +1746,7 @@ class MainWindow(QMainWindow):
         insert_at = self._left_layout.count() - 1   # before trailing addStretch
         self._left_layout.insertWidget(insert_at, panel)
         self._pyro_panel = panel
+        self._refit_left_panel()
 
     # ---- Slots --------------------------------------------------------
 
@@ -1682,7 +1884,7 @@ class MainWindow(QMainWindow):
     def _open_pyro_recorder_lazy(self) -> None:
         from pyro_recorder import PyroRecorder
         if self._pyro_recorder is None:
-            self._pyro_recorder = PyroRecorder(self._base_dir / "data")
+            self._pyro_recorder = PyroRecorder(self._data_dir)
         try:
             filename = self._filename_edit.text().strip() or "DATA"
             path = self._pyro_recorder.start_recording(
@@ -1885,7 +2087,7 @@ class MainWindow(QMainWindow):
 
         # Left-panel widget
         panel = ExtSerialPanel(
-            default_script_dir=self._base_dir / "scripts",
+            default_script_dir=paths.scripts_dir(),
             busy_ports_provider=self._ports_in_use,
         )
         saved_script = self._gui_cfg.get("ext_serial_script", "")
@@ -1904,6 +2106,7 @@ class MainWindow(QMainWindow):
         insert_at = self._left_layout.count() - 1   # before trailing addStretch
         self._left_layout.insertWidget(insert_at, panel)
         self._ext_serial_panel = panel
+        self._refit_left_panel()
         self._ext_plot_timer.start()
 
     # ---- Connection slots ----------------------------------------------
@@ -2281,7 +2484,7 @@ class MainWindow(QMainWindow):
     def _open_ext_serial_recorder_lazy(self) -> None:
         from ext_serial_recorder import ExtSerialRecorder
         if self._ext_serial_recorder is None:
-            self._ext_serial_recorder = ExtSerialRecorder(self._base_dir / "data")
+            self._ext_serial_recorder = ExtSerialRecorder(self._data_dir)
         if self._ext_serial_recorder.is_recording:
             return
         try:

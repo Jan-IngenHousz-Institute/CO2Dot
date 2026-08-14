@@ -4,30 +4,58 @@ on:
   push:
     paths:
       - 'Firmware/gui/**'
+      - '.github/workflows/buildGUI.yml'
   pull_request:
     paths:
       - 'Firmware/gui/**'
+      - '.github/workflows/buildGUI.yml'
   workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Headless runners have no display; the self-test builds real widgets.
+  QT_QPA_PLATFORM: offscreen
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    # One platform failing should not hide the state of the other two.
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.11']
+        include:
+          # Pinned, not ubuntu-latest: PyInstaller links against the build
+          # machine's glibc, so building on the newest Ubuntu produces a
+          # binary that refuses to start on Ubuntu 22.04 / Debian 12.
+          - os: ubuntu-22.04
+            asset: linux-x64
+            binary: dist/CO2Dot-Controller/CO2Dot-Controller
+          - os: windows-latest
+            asset: windows-x64
+            binary: dist/CO2Dot-Controller.exe
+          # macos-latest is arm64. Add `- os: macos-13` with asset
+          # macos-x64 to also cover Intel Macs.
+          - os: macos-latest
+            asset: macos-arm64
+            binary: dist/CO2Dot-Controller.app/Contents/MacOS/CO2Dot-Controller
+
+    defaults:
+      run:
+        working-directory: Firmware/gui
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: Firmware/gui/requirements.txt
 
+      # Qt's xcb/EGL platform plugins are dynamically loaded, so these are
+      # needed to run the self-test here — and by end users on their own
+      # machines, which is why the release notes have to mention them.
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -37,16 +65,63 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r Firmware/gui/requirements.txt
+          pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build executable
+      - name: Build
+        run: pyinstaller --noconfirm CO2Dot-Controller.spec
+
+      # Self-test, not a smoke check: it imports every bundled module and
+      # constructs the main window, which is the only way to catch a hidden
+      # import PyInstaller missed or a Qt platform plugin that failed to
+      # load. A windowed Windows build has no stdout, hence selftest.log.
+      - name: Self-test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          cd Firmware/gui
-          pyinstaller --onefile --windowed --name CO2Dot-Controller --collect-all PySide6 main.py
+          # A windowed .exe detaches immediately when run directly, so the
+          # step would pass before the test had finished. Resolve-Path
+          # because Start-Process reads the process CWD, not $PWD.
+          $exe = (Resolve-Path '${{ matrix.binary }}').Path
+          $p = Start-Process -FilePath $exe -ArgumentList '--selftest' `
+                             -Wait -PassThru -NoNewWindow
+          exit $p.ExitCode
+
+      - name: Self-test (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: '${{ matrix.binary }} --selftest'
+
+      - name: Self-test log
+        if: always()
+        continue-on-error: true
+        run: cat selftest.log
+
+      - name: Report bundle size
+        run: du -sh dist/* | sort -h
+        shell: bash
+
+      # A .app is a directory and a Linux binary carries an exec bit; both
+      # survive an archive but not the upload action's own re-zipping.
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ditto -c -k --keepParent dist/CO2Dot-Controller.app \
+                "CO2Dot-Controller-${{ matrix.asset }}.zip"
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          tar czf "CO2Dot-Controller-${{ matrix.asset }}.tar.gz" \
+              -C dist CO2Dot-Controller
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: cp dist/CO2Dot-Controller.exe "CO2Dot-Controller-${{ matrix.asset }}.exe"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CO2Dot-Controller-${{ matrix.os }}
-          path: Firmware/gui/dist/
+          name: CO2Dot-Controller-${{ matrix.asset }}
+          path: Firmware/gui/CO2Dot-Controller-${{ matrix.asset }}.*
+          if-no-files-found: error

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "data_dir": "",
+  "li_control_enabled": false,
+  "pyroscience_enabled": false,
+  "ext_serial_enabled": false,
+  "ext_serial_port": "",
+  "ext_serial_baud": 115200,
+  "ext_serial_script": "# Serial script — helpers:\n#   send(cmd)            raw serial command\n#   wait(s)              abort-interruptible sleep (time.sleep works too)\n#   param(name, value)   record/plot a named value\n#   pwm(v)               send('PWM v') + param('pwm', v)\n#   dc_offset(V)         AD3 LED drive, clamped 0..0.3 V + param('led_V', V)\n# Abort stops wait() immediately; `finally:` still runs — park outputs there.\ntry:\n    pwm(100)\n    wait(60)\n    pwm(0)\n    wait(60)\nfinally:\n    pwm(0)\n    dc_offset(0)\n"
+}

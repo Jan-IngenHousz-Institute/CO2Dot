@@ -1,4 +1,8 @@
-PySide6>=6.5
+# PySide6-Essentials, not PySide6: the full metapackage adds PySide6-Addons
+# (QtWebEngine, Qt3D, QtCharts, QtMultimedia), none of which this GUI imports
+# and which dominate the size of a packaged build. Installing the full
+# PySide6 still works for development — the build spec excludes the add-ons.
+PySide6-Essentials>=6.5
 pyqtgraph>=0.13
 pyserial>=3.5
 numpy>=1.24

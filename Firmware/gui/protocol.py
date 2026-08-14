@@ -104,6 +104,15 @@ def channel_display_name(ch: str) -> str:
     return _CHANNEL_DISPLAY.get(ch, ch)
 
 
+def channel_short_name(ch: str) -> str:
+    """Compact label for the plot legend.
+
+    Legend height is the constraint — all 13 AS7343 rows have to fit inside
+    the plot at startup — so the "nm" suffix is dropped. Everywhere with room
+    keeps channel_display_name()."""
+    return _CHANNEL_DISPLAY.get(ch, ch).replace("nm", "")
+
+
 def channels_for_model(model: str) -> list:
     if model == "AS7343":
         return AS7343_CHANNELS
