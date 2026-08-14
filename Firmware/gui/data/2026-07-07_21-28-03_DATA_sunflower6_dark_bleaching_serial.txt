@@ -1,5 +1,0 @@
-timestamp	event	name	value	detail
-2026-07-07T21:28:03.455	param	led_V	0.0	snapshot at record start
-2026-07-07T21:28:03.455	param	pwm	0.0	snapshot at record start
-2026-07-08T08:04:52.587	manual_command			dc_offset(0.1)
-2026-07-08T08:04:52.591	param	led_V	0.1	
