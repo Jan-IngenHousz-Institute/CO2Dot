@@ -40,7 +40,7 @@ static void serialJsonInit() {
 }
 
 static void serialJsonEnd() {
-  Serial.print(F("]}]}7A1E3AA1"));
+  Serial.print(F("]}]}"));
   Serial.print('\n');
 }
 
