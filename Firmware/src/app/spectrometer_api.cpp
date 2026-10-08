@@ -682,7 +682,7 @@ void cmd_spectrometer_set_atime(int argc, const char *argv[]) {
   if (val < 0 || val > 255) { doc["error"] = "atime_out_of_range"; respond(doc); return; }
   bool ok = false;
   if (spectrometer_model == SpectrometerModel::AS7341)
-    ok = (as7341_setAtIME(static_cast<uint8_t>(val)) == static_cast<uint8_t>(val));
+    ok = as7341_setAtIME(static_cast<uint8_t>(val));
   else if (spectrometer_model == SpectrometerModel::AS7343)
     ok = as7343_setAtIME(static_cast<uint8_t>(val));
   if (!ok) { doc["error"] = "set_failed"; respond(doc); return; }
@@ -698,7 +698,7 @@ void cmd_spectrometer_set_astep(int argc, const char *argv[]) {
   if (val < 0 || val > 65534) { doc["error"] = "astep_out_of_range"; respond(doc); return; }
   bool ok = false;
   if (spectrometer_model == SpectrometerModel::AS7341)
-    ok = (as7341_setAStep(static_cast<uint16_t>(val)) == static_cast<uint16_t>(val));
+    ok = as7341_setAStep(static_cast<uint16_t>(val));
   else if (spectrometer_model == SpectrometerModel::AS7343)
     ok = as7343_setAStep(static_cast<uint16_t>(val));
   if (!ok) { doc["error"] = "set_failed"; respond(doc); return; }

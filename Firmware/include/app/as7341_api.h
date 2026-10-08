@@ -10,9 +10,9 @@ bool as7341_readInto(SpectrometerResult *out);
 // *raw_out receives the ADC count; *sat_mask_out receives 0 or 1 (ASAT).
 bool as7341_readChannelFast(uint8_t out_index, uint16_t *raw_out,
                             uint16_t *sat_mask_out);
-uint8_t as7341_setAtIME(uint8_t atime_value);
+bool as7341_setAtIME(uint8_t atime_value);
 uint8_t as7341_getAtIME();
-uint16_t as7341_setAStep(uint16_t astep_value);
+bool as7341_setAStep(uint16_t astep_value);
 uint16_t as7341_getAStep();
 bool as7341_setGain(as7341_gain_t gain);
 uint8_t as7341_getGain();

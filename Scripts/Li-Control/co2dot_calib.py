@@ -30,6 +30,10 @@ Design notes
     watches the live H2O during dwells.
   * CO2 cartridge watchdog: if a setpoint above ambient is not reached while a
     lower one was, the run pauses (keeps logging) instead of burning cells.
+  * Opt-in Protocol options (off by default): settle each cell at its first CO2
+    setpoint, a separate 0 ppm tolerance, re-checking a tripped cell guard before
+    skipping, and drying the air before a cool-down (the exchanger undershoots
+    the new T by ~6 C, which tripped the guard on 2026-10-08).
   * The LED current is quantized by the AS7341 driver: 4 mA minimum, 2 mA steps,
     20 mA board maximum. `spec_flash,1` of the 2026-06 datasets was 4 mA.
 """
@@ -372,6 +376,16 @@ class Protocol:
     ambient_restore_ppm: float = 420.0
     seed: int = 0
     cartridge_life_h: float = 10.0          # assumed mixer-active hours per 8 g cartridge; EDIT from experience
+    # options, off by default (original behaviour)
+    co2_zero_tol_ppm: Optional[float] = None    # a 0 ppm setpoint counts as reached below this (scrub floor ~5-10 ppm)
+    settle_at_next_co2: bool = False            # hold the cell's first CO2 setpoint during the T/RH settle
+    cell_zero_dwell_s: Optional[float] = None   # dwell of each cell's 0 ppm step; use with settle_at_next_co2
+    guard_wait_s: float = 0.0                   # re-check a tripped cell guard this long before skipping the cell
+    cooldown_dry: bool = False                  # before cooling, dry until the dew point is cooldown_dew_gap_c below new T
+    cooldown_dew_gap_c: float = 7.0             # exchanger undershoot on a 5-8 C cool-down (~6 C observed) + 1 C
+    cooldown_dry_timeout_s: float = 900.0
+    max_dew_c: Optional[float] = None           # skip cells whose target dew point is above this (room-temperature
+                                                # lines; the LI-6800 humidifier topped out at ~19.7 C dew on 2026-10-08)
 
     @classmethod
     def quick(cls) -> "Protocol":
@@ -418,7 +432,9 @@ class Protocol:
                     add("cell_settle", p, rh, t, None, 0.0)
                     for sp in self.co2_levels:
                         jit = 0.0 if sp == 0 else rng.uniform(-self.co2_jitter_ppm, self.co2_jitter_ppm)
-                        add("co2", p, rh, t, round(sp + jit, 1), self.dwell_for(t, rh), co2_nominal=sp)
+                        dwell = self.cell_zero_dwell_s if (sp == 0 and self.cell_zero_dwell_s is not None) \
+                            else self.dwell_for(t, rh)
+                        add("co2", p, rh, t, round(sp + jit, 1), dwell, co2_nominal=sp)
             add("zero", p, self.anchor["rh"], self.anchor["t"], 0.0, self.zero_dwell_s, final=True)
         return out
 
@@ -639,6 +655,33 @@ class Run:
             return f"dew point {td:.1f} C within {margin:.1f} C of coldest surface {min(cold):.1f} C"
         return None
 
+    def _sample_dew_point(self) -> Optional[float]:
+        r = self.licor.read()
+        h2o, press = r.get("H2O_s"), r.get("Press")
+        if not isinstance(h2o, (int, float)) or not isinstance(press, (int, float)):
+            return None
+        return dew_point_from_h2o(h2o, press)
+
+    def _dry_before_cooling(self, i: int, t_new: float) -> bool:
+        """Lower the RH setpoint until the sample dew point is cooldown_dew_gap_c below t_new. True if it dried."""
+        P = self.protocol
+        target = t_new - P.cooldown_dew_gap_c
+        td, t_now = self._sample_dew_point(), self.licor.get("Tchamber")
+        if td is None or not isinstance(t_now, (int, float)) or td <= target:
+            return False
+        rh_dry = max(5.0, round(100.0 * psat_kpa(target - 1.0) / psat_kpa(t_now), 1))   # aim 1 C below target
+        self.licor.set(rh_air=rh_dry)
+        self.event("cooldown_dry", index=i, rh_air=rh_dry, td=round(td, 2), target_td=round(target, 2))
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < P.cooldown_dry_timeout_s:
+            td = self._sample_dew_point()
+            if td is not None and td <= target:
+                break
+            self._hold(5.0)
+        self.event("cooldown_dried", index=i, after_s=round(time.monotonic() - t0),
+                   td=None if td is None else round(td, 2), reached=td is not None and td <= target)
+        return True
+
     # -- scheduler ----------------------------------------------------------- #
     def run(self, resume: bool = True, start_index: Optional[int] = None) -> str:
         """Execute the protocol. Returns 'done', 'paused' (cartridge) or 'interrupted'.
@@ -663,13 +706,33 @@ class Run:
                 self._checkpoint(i)
                 if s["kind"] == "skip":
                     self.event("cell_skipped", index=i, rh=s["rh"], t=s["t"], reason=s["reason"]); i += 1; continue
+                if s["kind"] in ("cell_settle", "co2") and P.max_dew_c is not None \
+                        and dew_point_c(s["t"], s["rh"]) > P.max_dew_c:     # also when resuming inside such a cell
+                    self.event("cell_skipped", index=i, rh=s["rh"], t=s["t"],
+                               reason=f"dew point {dew_point_c(s['t'], s['rh']):.1f} C > max_dew_c {P.max_dew_c} C")
+                    j = i + 1          # step list unchanged (resume indices stay valid); chamber stays where it is
+                    while j < len(steps) and steps[j]["kind"] == "co2" and steps[j]["rh"] == s["rh"] and steps[j]["t"] == s["t"]:
+                        j += 1
+                    i = j; continue
 
                 # ---- humidity / temperature of the cell (also for anchor and zero steps)
                 if s["rh"] != cur_rh or s["t"] != cur_t:
                     new_rh = s["rh"] != cur_rh
-                    self.set_phase(kind="settle", step=i, rh=s["rh"], t=s["t"], co2=None, pass_=s["pass_"])
+                    settle_co2 = None
+                    if P.settle_at_next_co2:     # the cell's first CO2 step (or this anchor/zero step's own)
+                        nxt = steps[i + 1] if s["kind"] == "cell_settle" and i + 1 < len(steps) else s
+                        if nxt.get("co2") is not None:
+                            settle_co2 = float(nxt["co2"]); self.licor.set(co2_s=settle_co2)
+                    self.set_phase(kind="settle", step=i, rh=s["rh"], t=s["t"], co2=None, pass_=s["pass_"],
+                                   co2_settle=settle_co2)
+                    cooling = cur_t is not None and s["t"] < cur_t
+                    drier = cur_rh is not None and s["rh"] < cur_rh
+                    dried = cooling and P.cooldown_dry and self._dry_before_cooling(i, s["t"])
+                    rh_after_t = cooling and P.cooldown_dry and (dried or not drier)
                     # dry before cooling, warm before humidifying: order the two setpoints accordingly
-                    if cur_rh is not None and s["rh"] < cur_rh:
+                    if rh_after_t:       # cooling: keep the current (dry) RH setpoint until T is reached
+                        self.licor.set(tair=s["t"])
+                    elif drier:
                         self.licor.set(rh_air=s["rh"]); self.licor.set(tair=s["t"])
                     else:
                         self.licor.set(tair=s["t"]); self.licor.set(rh_air=s["rh"])
@@ -677,21 +740,31 @@ class Run:
                     ok_t, dt_t = self._wait("Tchamber", s["t"], P.t_tol_c, P.t_timeout_s)
                     self.event("t_reached" if ok_t else "t_timeout", index=i, t=s["t"], after_s=round(dt_t),
                                Tchamber=self.licor.get("Tchamber"))
+                    if rh_after_t:
+                        self.licor.set(rh_air=s["rh"])
                     ok_rh, dt_rh = self._wait("RHcham", s["rh"], P.rh_tol_pct, P.rh_timeout_s)
                     self.event("rh_reached" if ok_rh else "rh_timeout", index=i, rh=s["rh"], after_s=round(dt_rh),
                                RHcham=self.licor.get("RHcham"))
+                    # the exchanger undershoots right after a cool-down: give the guard time before skipping
                     guard = self._dewpoint_guard(s["t"])
+                    t_g = time.monotonic()
+                    while guard and time.monotonic() - t_g < P.guard_wait_s:
+                        self._hold(20.0); guard = self._dewpoint_guard(s["t"])
                     if guard:
-                        self.event("condensation_guard", index=i, detail=guard, action="skip cell")
+                        self.event("condensation_guard", index=i, detail=guard, action="skip cell",
+                                   waited_s=round(time.monotonic() - t_g))
                         cur_rh, cur_t = s["rh"], s["t"]
                         j = i
                         while j < len(steps) and steps[j]["rh"] == s["rh"] and steps[j]["t"] == s["t"]:
                             j += 1
                         i = j; continue
-                    # hold for film equilibration: long after an RH change, shorter after a T-only change
+                    if time.monotonic() - t_g > 1.0:
+                        self.event("condensation_guard_cleared", index=i, waited_s=round(time.monotonic() - t_g))
+                    # hold for film equilibration: long after an RH change (or a dry-down), shorter after a T-only change
                     t_hold0 = time.monotonic()
-                    min_hold = P.rh_settle_min_s if new_rh else P.t_settle_min_s
-                    max_hold = P.rh_settle_max_s if new_rh else P.t_settle_min_s
+                    long_hold = new_rh or dried
+                    min_hold = P.rh_settle_min_s if long_hold else P.t_settle_min_s
+                    max_hold = P.rh_settle_max_s if long_hold else P.t_settle_min_s
                     while True:
                         el = time.monotonic() - t_hold0
                         drift = self.film_drift()
@@ -710,6 +783,8 @@ class Run:
                                co2_nominal=s.get("co2_nominal", sp), transition=True)
                 self.licor.set(co2_s=sp)
                 tol = max(P.co2_tol_ppm, 0.01 * sp)
+                if sp == 0 and P.co2_zero_tol_ppm:      # the scrubber never reaches 0
+                    tol = P.co2_zero_tol_ppm
                 ok, dt = self._wait("CO2_s", sp, tol, P.co2_timeout_s)
                 co2_now = self.licor.get("CO2_s")
                 self.event("co2_reached" if ok else "co2_timeout", index=i, step_kind=s["kind"], co2=sp,
