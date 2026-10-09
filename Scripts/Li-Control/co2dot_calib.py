@@ -35,7 +35,8 @@ Design notes
     skipping, and drying the air before a cool-down (the exchanger undershoots
     the new T by ~6 C, which tripped the guard on 2026-10-08).
   * The LED current is quantized by the AS7341 driver: 4 mA minimum, 2 mA steps,
-    20 mA board maximum. `spec_flash,1` of the 2026-06 datasets was 4 mA.
+    20 mA board maximum. `spec_flash,1` of the 2026-06 datasets was 4 mA. The default
+    request is 1 mA (driven at 4 mA); the 2026-10-07 run used 10 mA.
 """
 from __future__ import annotations
 
@@ -55,6 +56,14 @@ CHANNELS = ["f1_415", "f2_445", "f3_480", "f4_515", "f5_555", "f6_590", "f7_630"
 LICOR_KEYS = ["TIME", "CO2_s", "CO2_r", "H2O_s", "H2O_r", "Tchamber", "Txchg", "Tleaf", "Tleaf2",
               "RHcham", "Flow", "Press", "Fan_speed", "Ta", "Tirga_block"]
 AS7341_FULL_SCALE = 65535
+
+
+def led_ma_actual(requested: int) -> int:
+    """LED current the AS7341 firmware actually drives: 0 = off, else 4 mA minimum, 2 mA steps, 20 mA board max."""
+    if requested <= 0:
+        return 0
+    r = min(max(int(requested), 4), 20)
+    return 4 + ((r - 4) // 2) * 2
 
 
 # ----------------------------------------------------------------------------- #
@@ -169,7 +178,7 @@ def apply_settings(dots: Dict[str, DotHandle], gain: Optional[int] = None, atime
     return out
 
 
-def preflight(dots: Dict[str, DotHandle], led_ma: int = 10, n: int = 3, min_led_ratio: float = 0.5,
+def preflight(dots: Dict[str, DotHandle], led_ma: int = 1, n: int = 3, min_led_ratio: float = 0.5,
               verbose: bool = True) -> Dict[str, Dict[str, Any]]:
     """Per device: command timing, saturation, LED signal (diff vs dark) and shot-to-shot noise.
 
@@ -203,7 +212,8 @@ def preflight(dots: Dict[str, DotHandle], led_ma: int = 10, n: int = 3, min_led_
         report[dev_id] = rec
         if verbose:
             d = rec.get("diff", {})
-            print(f"[{h.label} {dev_id} {h.port}] flash {rec.get('spec_flash_s', float('nan')):.2f} s  settings {rec.get('settings')}")
+            print(f"[{h.label} {dev_id} {h.port}] flash {rec.get('spec_flash_s', float('nan')):.2f} s  "
+                  f"LED {led_ma} mA requested = {led_ma_actual(led_ma)} mA  settings {rec.get('settings')}")
             if d:
                 print("   diff: " + "  ".join(f"{c[-3:]}:{d[c]:.0f}" for c in d) +
                       f"   dark clear {rec['dark'].get('clear', 0):.0f}   noise 515/630 "
@@ -312,7 +322,7 @@ class MockDot:
         r = self.licor.read()
         return {"T": r["Tchamber"] + 4.0, "P": 1003.5, "RH": rh_at(r["Tchamber"], r["RHcham"], r["Tchamber"] + 4.0), "Gas": 1000}
 
-    def spec_flash(self, led_ma=10):
+    def spec_flash(self, led_ma=1):
         self._advance()
         g = 2 ** (self.cfg["gain"] - 5)
         dark, lit, diff = {}, {}, {}
@@ -344,7 +354,8 @@ class Protocol:
     Humidity is the slowest variable, so RH blocks are outermost, T levels inside,
     CO2 steps innermost. `passes` > 1 repeats the whole grid in reversed order to
     separate drift/hysteresis from condition. A zero (scrub) and an anchor step
-    open each RH block; the zero is repeated at the end of each pass.
+    open each RH block; the zero is repeated at the end of each pass. `extra_cells`
+    appends one more block after the last pass, closed by an anchor + zero.
     """
     rh_levels: Tuple[float, ...] = (30, 45, 60, 75)
     t_levels: Tuple[float, ...] = (17, 22, 27, 32)
@@ -386,6 +397,9 @@ class Protocol:
     cooldown_dry_timeout_s: float = 900.0
     max_dew_c: Optional[float] = None           # skip cells whose target dew point is above this (room-temperature
                                                 # lines; the LI-6800 humidifier topped out at ~19.7 C dew on 2026-10-08)
+    extra_cells: Tuple[Tuple[float, float], ...] = ()   # (t, rh) cells run as one block after the last pass, framed by
+                                                        # anchor + zero; rh_cap_by_t does not apply, the margins do
+    extra_dwell_s: Optional[float] = None       # dwell of every CO2 step of the extra block, 0 ppm included
 
     @classmethod
     def quick(cls) -> "Protocol":
@@ -436,6 +450,23 @@ class Protocol:
                             else self.dwell_for(t, rh)
                         add("co2", p, rh, t, round(sp + jit, 1), dwell, co2_nominal=sp)
             add("zero", p, self.anchor["rh"], self.anchor["t"], 0.0, self.zero_dwell_s, final=True)
+        if self.extra_cells:                    # appended after the passes, so earlier step indices never change
+            p, a = self.passes, self.anchor
+            add("anchor", p, a["rh"], a["t"], a["co2"], self.anchor_dwell_s)
+            add("zero", p, a["rh"], a["t"], 0.0, self.zero_dwell_s)
+            for t, rh in self.extra_cells:
+                margin = t - dew_point_c(t, rh)
+                if margin < self.dewpoint_margin_c:
+                    add("skip", p, rh, t, None, 0.0, reason=f"dew-point margin {margin:.1f} C < {self.dewpoint_margin_c} C")
+                    continue
+                add("cell_settle", p, rh, t, None, 0.0)
+                for sp in self.co2_levels:
+                    jit = 0.0 if sp == 0 else rng.uniform(-self.co2_jitter_ppm, self.co2_jitter_ppm)
+                    dwell = self.extra_dwell_s if self.extra_dwell_s is not None else (
+                        self.cell_zero_dwell_s if (sp == 0 and self.cell_zero_dwell_s is not None) else self.dwell_for(t, rh))
+                    add("co2", p, rh, t, round(sp + jit, 1), dwell, co2_nominal=sp)
+            add("anchor", p, a["rh"], a["t"], a["co2"], self.anchor_dwell_s, final=True)
+            add("zero", p, a["rh"], a["t"], 0.0, self.zero_dwell_s, final=True)
         return out
 
     def estimate(self) -> Dict[str, float]:
@@ -486,7 +517,7 @@ class Run:
     """One calibration run directory: cycles.jsonl, events.jsonl, meta.json, checkpoint.json."""
 
     def __init__(self, outdir, dots: Dict[str, DotHandle], licor, protocol: Protocol, *,
-                 cadence_s: float = 10.0, led_ma: int = 10, settings_every_n: int = 30,
+                 cadence_s: float = 10.0, led_ma: int = 1, settings_every_n: int = 30,
                  meta_extra: Optional[Dict[str, Any]] = None, verbose: bool = True):
         self.outdir = Path(outdir); self.outdir.mkdir(parents=True, exist_ok=True)
         self.dots, self.licor, self.protocol = dots, licor, protocol
@@ -506,7 +537,7 @@ class Run:
         meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
         meta.setdefault("created", datetime.now().isoformat(timespec="seconds"))
         meta.update({
-            "cadence_s": self.cadence_s, "led_ma_requested": self.led_ma,
+            "cadence_s": self.cadence_s, "led_ma_requested": self.led_ma, "led_ma_actual": led_ma_actual(self.led_ma),
             "led_ma_note": "AS7341 driver quantizes to 4 mA minimum, 2 mA steps, 20 mA max",
             "protocol": asdict(self.protocol),
             "devices": {d: {"port": h.port, "label": h.label, "firmware": h.firmware} for d, h in self.dots.items()},
@@ -606,7 +637,9 @@ class Run:
             if isinstance(v, (int, float)) and abs(v - target) < tol:
                 return True, time.monotonic() - t0
             self._stop.wait(1.0)
-        return False, time.monotonic() - t0
+        v = self.licor.get(key)             # last reading: a setpoint reached while the PC slept is not a timeout
+        ok = isinstance(v, (int, float)) and abs(v - target) < tol
+        return ok, time.monotonic() - t0
 
     def _hold(self, seconds: float) -> None:
         if self._stop.wait(seconds):
