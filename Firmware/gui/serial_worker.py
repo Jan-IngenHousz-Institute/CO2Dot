@@ -23,7 +23,7 @@ HELLO_TIMEOUT = 5.0  # seconds to wait for hello response
 class SerialWorker(QThread):
     # Signals emitted on the Qt main thread via queued connections
     spec_received    = Signal(dict)   # {"model": str, "channels": dict}
-    bme_received     = Signal(dict)   # {"T": float, "P": float, "RH": float, "Gas": int}
+    bme_received     = Signal(dict)   # {"T": float, "P": float, "RH": float[, "Gas": int]}
     status_received  = Signal(dict)   # {"spectrometer": {...}, "bme": {...}}
     spec_config_received = Signal(dict)  # {"atime": int, "astep": int, "gain": int}
     error_received   = Signal(str)    # human-readable error string

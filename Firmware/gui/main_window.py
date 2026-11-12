@@ -480,6 +480,7 @@ class MainWindow(QMainWindow):
         self._bme_curves: dict[str, pg.PlotDataItem] = {}
         self._bme_axes: dict[str, pg.AxisItem] = {}
         self._bme_vbs: dict[str, pg.ViewBox] = {}
+        self._bme_axis_shown: dict[str, bool] = {}
         self._build_bme_axes()
 
         splitter.addWidget(self._spec_plot)
@@ -1191,17 +1192,21 @@ class MainWindow(QMainWindow):
             vals = self._bme_buffer.field(field)
             if len(vals) != len(t_rel):
                 continue
-            color = BME_COLORS[field]
-            vb = self._bme_vbs[field]
-            if field not in self._bme_curves:
+            # A field the device does not report (Gas, while its gas heater
+            # is off) is all NaN: no axis, and no curve or legend entry
+            # until a first value arrives.
+            has_data = bool(np.isfinite(vals).any())
+            self._set_bme_axis_shown(field, has_data)
+            if has_data and field not in self._bme_curves:
                 label = f"{field} ({BME_UNITS[field]})"
-                pen = pg.mkPen(color=color, width=1.5)
+                pen = pg.mkPen(color=BME_COLORS[field], width=1.5)
                 curve = pg.PlotDataItem(pen=pen, name=label)
-                vb.addItem(curve)
+                self._bme_vbs[field].addItem(curve)
                 self._bme_legend.addItem(curve, label)
                 self._bme_curves[field] = curve
                 self._connect_legend_toggle(self._bme_legend, curve)
-            self._bme_curves[field].setData(t_rel, vals)
+            if field in self._bme_curves:
+                self._bme_curves[field].setData(t_rel, vals)
 
         # Ensure overlay ViewBoxes have correct geometry (needed on first data)
         self._sync_bme_viewboxes()
@@ -1209,6 +1214,18 @@ class MainWindow(QMainWindow):
         if self._auto_range:
             for vb in self._bme_vbs.values():
                 vb.enableAutoRange()
+
+    def _set_bme_axis_shown(self, field: str, shown: bool) -> None:
+        if self._bme_axis_shown.get(field, True) == shown:
+            return
+        self._bme_axis_shown[field] = shown
+        axis = self._bme_axes[field]
+        # AxisItem.show()/hide() rather than setVisible(): they also give
+        # the axis its width back, or collapse it to zero, in the layout.
+        if shown:
+            axis.show()
+        else:
+            axis.hide()
 
     # ------------------------------------------------------------------
     # Settings file: shipped defaults + user state

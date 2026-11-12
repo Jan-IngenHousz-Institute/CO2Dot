@@ -152,7 +152,8 @@ def classify_line(line: str) -> tuple[str, object]:
     """
     Classify an incoming serial line and return (kind, parsed) where kind is
     one of: 'hello', 'status', 'spec', 'spec_flash', 'bme', 'spec_config',
-    'led_set', 'error', 'unknown'.
+    'led_set', 'error', 'unknown'. A 'bme' reading always has T, P and RH;
+    Gas is present only when the device reports it.
 
     Responses follow the command-as-root protocol (see
     /CommunicationProtocolOpenJIISerial.md): there are no wrapper keys, so each
@@ -197,12 +198,21 @@ def classify_line(line: str) -> tuple[str, object]:
     if "led_current_ma" in obj:
         return ("led_set", obj)
 
-    # BME read — {"T":..,"P":..,"RH":..,"Gas":..}
-    if all(k in obj for k in ("T", "P", "RH", "Gas")):
-        return ("bme", {
-            "T": float(obj["T"]), "P": float(obj["P"]),
-            "RH": float(obj["RH"]), "Gas": int(obj["Gas"]),
-        })
+    # BME read — {"T":..,"P":..,"RH":..} and, only while the device measures
+    # it, "Gas". Firmware 1.2 keeps the gas heater off unless told
+    # `bme_gas,1` and then sends {"T","P","RH","n"}; requiring "Gas" here
+    # would drop every one of those readings.
+    if all(k in obj for k in ("T", "P", "RH")):
+        try:
+            reading = {
+                "T": float(obj["T"]), "P": float(obj["P"]),
+                "RH": float(obj["RH"]),
+            }
+            if obj.get("Gas") is not None:
+                reading["Gas"] = int(obj["Gas"])
+        except (TypeError, ValueError):
+            return ("unknown", stripped)
+        return ("bme", reading)
 
     # Config ack — {"atime":..,"astep":..,"gain":..}
     if all(k in obj for k in ("atime", "astep", "gain")):

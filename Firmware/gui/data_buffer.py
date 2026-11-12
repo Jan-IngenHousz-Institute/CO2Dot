@@ -44,7 +44,10 @@ class SpecBuffer:
 
 
 class BmeBuffer:
-    """Stores timestamped BME68x readings (T, P, RH, Gas)."""
+    """Stores timestamped BME68x readings (T, P, RH, Gas).
+
+    A field missing from a reading is stored as NaN, so a device that does
+    not report Gas still lines up with the other three."""
 
     FIELDS = ("T", "P", "RH", "Gas")
 
