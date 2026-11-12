@@ -15,6 +15,7 @@ layout (gui/data, gui/sequences) behaves exactly as before.
 
 from __future__ import annotations
 
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -91,6 +92,22 @@ def config_path() -> Path:
 
 def default_config_path() -> Path:
     return resource_path(DEFAULT_CONFIG_NAME)
+
+
+# Characters Windows refuses in a file name. Linux and macOS accept all but
+# "/", but a recording made there has to survive being copied to a Windows
+# machine or a OneDrive/SharePoint folder, so the strictest set applies
+# everywhere.
+_UNSAFE_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def safe_filename(name: str, default: str = "DATA") -> str:
+    """`name` made usable as part of a file name on every platform.
+
+    Also keeps a stray "/" from turning a name into a path to a directory
+    that does not exist."""
+    cleaned = _UNSAFE_FILENAME_CHARS.sub("_", str(name)).strip()
+    return cleaned or default
 
 
 def is_writable(directory: Path) -> bool:

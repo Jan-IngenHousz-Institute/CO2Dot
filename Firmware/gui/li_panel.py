@@ -10,13 +10,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
-    QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -29,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from li_control import LiConfig, LiSetpoints
+from ui_helpers import StatusLabel, compact_button, form_layout
 
 
 class LiControlPanel(QGroupBox):
@@ -99,8 +99,7 @@ class LiControlPanel(QGroupBox):
 
     def _build_ssh_group(self) -> QGroupBox:
         grp = QGroupBox("SSH")
-        form = QFormLayout(grp)
-        form.setLabelAlignment(Qt.AlignLeft)
+        form = form_layout(grp)
 
         self._host_combo = QComboBox()
         self._host_combo.setEditable(True)
@@ -120,8 +119,7 @@ class LiControlPanel(QGroupBox):
 
         self._key_edit = QLineEdit()
         self._key_edit.setPlaceholderText("(optional)")
-        self._key_browse_btn = QPushButton("…")
-        self._key_browse_btn.setFixedWidth(28)
+        self._key_browse_btn = compact_button("…", "Browse for a key file")
         self._key_browse_btn.clicked.connect(self._on_browse_key)
         key_row = QWidget()
         key_h = QHBoxLayout(key_row)
@@ -135,8 +133,7 @@ class LiControlPanel(QGroupBox):
         self._connect_btn = QPushButton("Connect")
         self._connect_btn.clicked.connect(self._on_connect_clicked)
 
-        self._status_lbl = QLabel("Not connected")
-        self._status_lbl.setStyleSheet("color: #cdd6f4;")
+        self._status_lbl = StatusLabel("Not connected")
 
         form.addRow("Host:", host_row)
         form.addRow("User:", self._user_edit)
@@ -148,8 +145,7 @@ class LiControlPanel(QGroupBox):
 
     def _build_setpoints_group(self) -> QGroupBox:
         grp = QGroupBox("Manual Setpoints")
-        form = QFormLayout(grp)
-        form.setLabelAlignment(Qt.AlignLeft)
+        form = form_layout(grp)
 
         def spin(val: float, mn: float, mx: float, dec: int, suffix: str = "") -> QDoubleSpinBox:
             w = QDoubleSpinBox()
@@ -199,8 +195,7 @@ class LiControlPanel(QGroupBox):
 
     def _build_readback_group(self) -> QGroupBox:
         grp = QGroupBox("Readback")
-        form = QFormLayout(grp)
-        form.setLabelAlignment(Qt.AlignLeft)
+        form = form_layout(grp)
         self._rb_labels: dict[str, QLabel] = {}
         for key in ("CO2_r", "CO2_s", "H2O_r", "H2O_s",
                     "Tchamber", "Tleaf", "RHcham", "PPFD_in"):
@@ -330,15 +325,13 @@ class LiControlPanel(QGroupBox):
     def on_connected(self, host: str) -> None:
         self._connected = True
         self._connect_btn.setText("Disconnect")
-        self._status_lbl.setText(f"Connected: {host}")
-        self._status_lbl.setStyleSheet("color: #a6e3a1;")
+        self._status_lbl.set_status(f"Connected: {host}", "ok")
         self._refresh_enabled()
 
     def on_disconnected(self) -> None:
         self._connected = False
         self._connect_btn.setText("Connect")
-        self._status_lbl.setText("Not connected")
-        self._status_lbl.setStyleSheet("color: #cdd6f4;")
+        self._status_lbl.set_status("Not connected")
         self._refresh_enabled()
 
     def on_sequence_started(self) -> None:

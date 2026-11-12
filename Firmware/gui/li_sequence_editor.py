@@ -24,7 +24,6 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QDoubleSpinBox,
     QFileDialog,
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -44,6 +43,7 @@ from li_sequence import (
     save_sequence,
     validate_sequence,
 )
+from ui_helpers import form_layout
 
 
 # Optional numeric setpoints shown as "Set …" checkbox + spin box.
@@ -97,7 +97,7 @@ class StepEditorDialog(QDialog):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        form = QFormLayout()
+        form = form_layout()
         layout.addLayout(form)
 
         self._name_edit = QLineEdit()

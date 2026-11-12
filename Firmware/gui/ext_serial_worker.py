@@ -1,10 +1,11 @@
 """
 ext_serial_worker.py — QThread owning the external (scripting) serial port.
 
-Unlike SerialWorker/PyroWorker, this worker opens the port with DTR/RTS
-de-asserted BEFORE open(): the target ESP32 wires DTR→IO0 and RTS→EN, so a
-default open() auto-resets the board mid-experiment. For the same reason the
-port is never hello-probed — connection is by explicit user selection only.
+Unlike SerialWorker/PyroWorker, this worker opens the port with DTR/RTS held
+de-asserted (device_manager.open_serial(quiet_lines=True) — how that is done
+differs per OS): the target ESP32 wires DTR→IO0 and RTS→EN, so a default
+open() auto-resets the board mid-experiment. For the same reason the port is
+never hello-probed — connection is by explicit user selection only.
 
 Lifecycle follows PyroWorker (threading.Event abort); command sending follows
 SerialWorker (thread-safe outgoing queue.Queue). send_command() raises
@@ -20,6 +21,8 @@ import time
 
 import serial
 from PySide6.QtCore import QThread, Signal
+
+import device_manager
 
 LINE_ENDING = "\r\n"       # the ESP32 CLI expects CRLF
 DEFAULT_BAUD = 115200
@@ -77,25 +80,17 @@ class ExtSerialWorker(QThread):
 
     def run(self) -> None:
         try:
-            ser = serial.Serial()          # two-step open: nothing asserted yet
-            ser.port = self._port
-            ser.baudrate = self._baud
-            ser.timeout = SERIAL_READ_TIMEOUT_S
-            ser.write_timeout = 1.0
-            ser.dtr = False                # don't drive IO0
-            ser.rts = False                # don't drive EN → no ESP32 auto-reset
-            ser.open()
+            # quiet_lines: IO0/EN stay undriven → no ESP32 auto-reset
+            ser = device_manager.open_serial(
+                self._port, self._baud,
+                timeout=SERIAL_READ_TIMEOUT_S,
+                quiet_lines=True,
+            )
             ser.reset_input_buffer()       # device already running; drop stale bytes
             self._ser = ser
         except (serial.SerialException, OSError) as exc:
-            text = str(exc)
-            if "PermissionError" in text or "Access is denied" in text:
-                self.error_received.emit(
-                    f"Serial: {self._port} is in use — close the PlatformIO "
-                    "monitor / other terminal first")
-            else:
-                self.error_received.emit(
-                    f"Serial: cannot open {self._port}: {exc}")
+            self.error_received.emit(
+                "Serial: " + device_manager.describe_open_error(self._port, exc))
             self.disconnected.emit()
             return
 

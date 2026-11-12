@@ -18,6 +18,7 @@ import time
 import serial
 from PySide6.QtCore import QThread, Signal
 
+import device_manager
 import pyro_protocol
 
 
@@ -76,15 +77,15 @@ class PyroWorker(QThread):
     # ---- Thread run loop ----------------------------------------------
     def run(self) -> None:
         try:
-            self._ser = serial.Serial(
+            self._ser = device_manager.open_serial(
                 self._port,
                 pyro_protocol.BAUD,
                 timeout=SERIAL_READ_TIMEOUT_S,
-                write_timeout=1.0,
             )
             self._ser.reset_input_buffer()
         except (serial.SerialException, OSError) as exc:
-            self.error_received.emit(f"Pyro: cannot open {self._port}: {exc}")
+            self.error_received.emit(
+                "Pyro: " + device_manager.describe_open_error(self._port, exc))
             self.disconnected.emit()
             return
 

@@ -15,10 +15,8 @@ from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
-    QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
@@ -28,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 import device_manager
+from ui_helpers import StatusLabel, compact_button, form_layout
 
 BAUD_RATES = ["9600", "19200", "38400", "57600", "115200",
               "230400", "460800", "921600"]
@@ -102,14 +101,11 @@ class ExtSerialPanel(QGroupBox):
 
         # --- Connection ---
         conn_grp = QGroupBox("Connection")
-        form = QFormLayout(conn_grp)
-        form.setLabelAlignment(Qt.AlignLeft)
+        form = form_layout(conn_grp)
 
         self._port_combo = QComboBox()
         self._port_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self._refresh_btn = QPushButton("⟳")
-        self._refresh_btn.setFixedWidth(28)
-        self._refresh_btn.setToolTip("Refresh port list")
+        self._refresh_btn = compact_button("⟳", "Refresh port list")
         self._refresh_btn.clicked.connect(self._refresh_ports)
 
         port_row = QWidget()
@@ -127,9 +123,8 @@ class ExtSerialPanel(QGroupBox):
         self._connect_btn = QPushButton("Connect")
         self._connect_btn.clicked.connect(self._on_connect_clicked)
 
-        self._status_lbl = QLabel("Not connected")
+        self._status_lbl = StatusLabel("Not connected")
         self._status_lbl.setWordWrap(True)
-        self._status_lbl.setStyleSheet("color: #cdd6f4;")
 
         form.addRow("Port:", port_row)
         form.addRow("Baud:", self._baud_combo)
@@ -345,20 +340,17 @@ class ExtSerialPanel(QGroupBox):
         self._connect_btn.setText("Disconnect")
         port = info.get("port", "")
         baud = info.get("baud", "")
-        self._status_lbl.setText(f"Connected: {port} @ {baud}")
-        self._status_lbl.setStyleSheet("color: #a6e3a1;")
+        self._status_lbl.set_status(f"Connected: {port} @ {baud}", "ok")
         self._refresh_enabled()
 
     def on_disconnected(self) -> None:
         self._connected = False
         self._connect_btn.setText("Connect")
-        self._status_lbl.setText("Not connected")
-        self._status_lbl.setStyleSheet("color: #cdd6f4;")
+        self._status_lbl.set_status("Not connected")
         self._refresh_enabled()
 
     def on_error(self, msg: str) -> None:
-        self._status_lbl.setText(msg)
-        self._status_lbl.setStyleSheet("color: #f38ba8;")
+        self._status_lbl.set_status(msg, "error")
 
     def on_script_started(self) -> None:
         self._script_running = True

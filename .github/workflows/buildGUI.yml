@@ -33,8 +33,9 @@ jobs:
           - os: windows-latest
             asset: windows-x64
             binary: dist/CO2Dot-Controller.exe
-          # macos-latest is arm64. Add `- os: macos-13` with asset
-          # macos-x64 to also cover Intel Macs.
+          # macos-latest is arm64, so this build runs on Apple Silicon only.
+          # Add an Intel macOS runner with asset macos-x64 to also cover
+          # Intel Macs.
           - os: macos-latest
             asset: macos-arm64
             binary: dist/CO2Dot-Controller.app/Contents/MacOS/CO2Dot-Controller
@@ -53,14 +54,21 @@ jobs:
           cache: pip
           cache-dependency-path: Firmware/gui/requirements.txt
 
-      # Qt's xcb/EGL platform plugins are dynamically loaded, so these are
-      # needed to run the self-test here — and by end users on their own
-      # machines, which is why the release notes have to mention them.
+      # Qt's platform plugins are loaded at run time, so nothing fails at
+      # build time when their libraries are absent. The first line is what
+      # Qt itself needs and every desktop already has. The libxcb-* set is
+      # what the X11 plugin needs and a stock Ubuntu does NOT have; with
+      # them installed here PyInstaller copies them into the bundle, so the
+      # download starts on X11 without the user installing anything.
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libdbus-1-3 libfontconfig1
+          sudo apt-get install -y \
+            libegl1 libgl1 libxkbcommon0 libdbus-1-3 libfontconfig1 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-render-util0 libxcb-shape0 libxcb-util1 libxcb-xkb1 \
+            libxkbcommon-x11-0 xvfb
 
       - name: Install Python dependencies
         run: |
@@ -90,6 +98,18 @@ jobs:
       - name: Self-test (Linux/macOS)
         if: runner.os != 'Windows'
         run: '${{ matrix.binary }} --selftest'
+
+      # The run above uses the offscreen platform, which no user has. This
+      # one starts the bundle on a real X server through Qt's xcb plugin,
+      # and first checks the bundle brought the library that plugin is
+      # best known for missing.
+      - name: Self-test on X11 (Linux)
+        if: runner.os == 'Linux'
+        env:
+          QT_QPA_PLATFORM: xcb
+        run: |
+          test -n "$(find dist -name 'libxcb-cursor.so*')"
+          xvfb-run -a '${{ matrix.binary }}' --selftest
 
       - name: Self-test log
         if: always()

@@ -166,5 +166,11 @@ else:
                 # still gates the enumeration behind this prompt.
                 "NSSystemAdministrationUsageDescription":
                     "CO2Dot communicates with USB serial instruments.",
+                # Shown in the "find devices on your local network" prompt
+                # macOS raises the first time Li-Control scans for or
+                # connects to the LI-6800.
+                "NSLocalNetworkUsageDescription":
+                    "CO2Dot finds and controls a LI-COR LI-6800 on the "
+                    "local network.",
             },
         )

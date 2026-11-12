@@ -45,6 +45,7 @@ SELFTEST_MODULES = [
     "protocol",
     "recorder",
     "serial_worker",
+    "ui_helpers",
     # Application: optional features, all lazily imported by main_window
     "ext_serial_buffer",
     "ext_serial_panel",

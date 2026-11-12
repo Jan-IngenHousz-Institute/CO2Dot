@@ -42,6 +42,7 @@ import protocol
 from data_buffer import BmeBuffer, SpecBuffer
 from recorder import Recorder
 from serial_worker import SerialWorker
+from ui_helpers import compact_button, form_layout
 
 # ---------------------------------------------------------------------------
 # Colour palettes for plots
@@ -343,8 +344,7 @@ class MainWindow(QMainWindow):
 
         # --- Connection group ---
         grp_conn = QGroupBox("Connection")
-        form_conn = QFormLayout(grp_conn)
-        form_conn.setLabelAlignment(Qt.AlignLeft)
+        form_conn = form_layout(grp_conn)
         # If the column is ever dragged narrow, wrap the row under its label
         # rather than clipping the buttons off its right-hand end.
         form_conn.setRowWrapPolicy(QFormLayout.WrapLongRows)
@@ -356,15 +356,11 @@ class MainWindow(QMainWindow):
         self._port_combo.setMinimumContentsLength(12)
         self._port_combo.setSizeAdjustPolicy(
             QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self._refresh_btn = QPushButton("⟳")
-        self._refresh_btn.setFixedWidth(28)
-        self._refresh_btn.setToolTip("Refresh port list")
+        self._refresh_btn = compact_button("⟳", "Refresh port list")
         self._refresh_btn.clicked.connect(self._refresh_ports)
 
-        self._auto_btn = QPushButton("Auto")
-        self._auto_btn.setFixedWidth(44)
-        self._auto_btn.setToolTip(
-            "Scan ports and auto-connect CO2Dot + Pyroscience")
+        self._auto_btn = compact_button(
+            "Auto", "Scan ports and auto-connect CO2Dot + Pyroscience")
         self._auto_btn.clicked.connect(self._on_port_autodetect)
 
         port_row = QWidget()
@@ -389,8 +385,7 @@ class MainWindow(QMainWindow):
 
         # --- Settings group ---
         grp_set = QGroupBox("Settings")
-        form_set = QFormLayout(grp_set)
-        form_set.setLabelAlignment(Qt.AlignLeft)
+        form_set = form_layout(grp_set)
 
         # Interval
         self._interval_combo = QComboBox()
@@ -613,11 +608,14 @@ class MainWindow(QMainWindow):
         self._filename_edit.setToolTip(
             f"Recordings are saved to:\n{self._data_dir}")
 
-        self._record_btn = QPushButton("⏺  Record")
+        # ● and ■ rather than the media-control symbols ⏺/⏹: those sit in a
+        # block that stock Linux fonts do not cover (they render as empty
+        # boxes) and that Windows and macOS replace with colour emoji.
+        self._record_btn = QPushButton("●  Record")
         self._record_btn.setEnabled(False)
         self._record_btn.clicked.connect(self._on_record_start)
 
-        self._stop_rec_btn = QPushButton("⏹  Stop Rec")
+        self._stop_rec_btn = QPushButton("■  Stop Rec")
         self._stop_rec_btn.setEnabled(False)
         self._stop_rec_btn.clicked.connect(self._on_record_stop)
 
@@ -676,7 +674,12 @@ class MainWindow(QMainWindow):
                     f"{port} is in use by {busy[port]} — pick another port")
                 return
             self._status_bar.showMessage(f"Checking {port}…")
-            detected = device_manager.check_port(port)
+            try:
+                detected = device_manager.check_port(port)
+            except device_manager.PortOpenError as exc:
+                # In use, no permission, unplugged — not "nothing answered".
+                self._status_bar.showMessage(str(exc))
+                return
             if not detected:
                 self._status_bar.showMessage(
                     f"{port}: no known device found (no hello response)"
@@ -921,8 +924,15 @@ class MainWindow(QMainWindow):
     # Recording control
     # ------------------------------------------------------------------
 
+    def _record_name(self) -> str:
+        """The name typed in the File box, safe to use on any filesystem.
+
+        Every recorder gets its name from here so the main file and its
+        _pyro / _serial sidecars always share one stem."""
+        return paths.safe_filename(self._filename_edit.text())
+
     def _on_record_start(self):
-        filename = self._filename_edit.text().strip() or "DATA"
+        filename = self._record_name()
         mode = "flash" if self._mode_flash.isChecked() else "ambient"
 
         # Serial Scripting: freeze the extra param columns for this file.
@@ -1886,7 +1896,7 @@ class MainWindow(QMainWindow):
         if self._pyro_recorder is None:
             self._pyro_recorder = PyroRecorder(self._data_dir)
         try:
-            filename = self._filename_edit.text().strip() or "DATA"
+            filename = self._record_name()
             path = self._pyro_recorder.start_recording(
                 filename=filename,
                 idnr=self._pyro_idnr,
@@ -2008,8 +2018,13 @@ class MainWindow(QMainWindow):
             # port in Serial Scripting manually.
             msgs.append(f"ambyte on {amb} — select it in Serial Scripting")
 
-        self._status_bar.showMessage(
-            "Autodetect: " + ("; ".join(msgs) if msgs else "no devices found"))
+        if not msgs:
+            # A port this user may not open (Linux without the serial group)
+            # looks exactly like an empty bench unless it is said out loud.
+            denied = found.get("denied")
+            msgs.append(f"no devices found — {denied}" if denied
+                        else "no devices found")
+        self._status_bar.showMessage("Autodetect: " + "; ".join(msgs))
 
     def _toggle_ext_serial(self, enabled: bool) -> None:
         if (not enabled
@@ -2488,7 +2503,7 @@ class MainWindow(QMainWindow):
         if self._ext_serial_recorder.is_recording:
             return
         try:
-            filename = self._filename_edit.text().strip() or "DATA"
+            filename = self._record_name()
             path = self._ext_serial_recorder.start_recording(filename=filename)
             self._status_bar.showMessage(f"Serial event log → {path.name}")
         except OSError as exc:

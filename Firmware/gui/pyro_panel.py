@@ -7,14 +7,12 @@ level. The worker is owned by MainWindow; the panel only emits signals.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
-    QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QLabel,
     QPushButton,
     QSizePolicy,
     QSpinBox,
@@ -23,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 import device_manager
+from ui_helpers import StatusLabel, compact_button, form_layout
 
 
 class PyroPanel(QGroupBox):
@@ -48,14 +47,11 @@ class PyroPanel(QGroupBox):
         layout.setSpacing(6)
 
         conn_grp = QGroupBox("Connection")
-        form = QFormLayout(conn_grp)
-        form.setLabelAlignment(Qt.AlignLeft)
+        form = form_layout(conn_grp)
 
         self._port_combo = QComboBox()
         self._port_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self._refresh_btn = QPushButton("⟳")
-        self._refresh_btn.setFixedWidth(28)
-        self._refresh_btn.setToolTip("Refresh port list")
+        self._refresh_btn = compact_button("⟳", "Refresh port list")
         self._refresh_btn.clicked.connect(self._refresh_ports)
 
         port_row = QWidget()
@@ -78,9 +74,8 @@ class PyroPanel(QGroupBox):
         self._connect_btn = QPushButton("Connect")
         self._connect_btn.clicked.connect(self._on_connect_clicked)
 
-        self._status_lbl = QLabel("Not connected")
+        self._status_lbl = StatusLabel("Not connected")
         self._status_lbl.setWordWrap(True)
-        self._status_lbl.setStyleSheet("color: #cdd6f4;")
 
         form.addRow("Port:", port_row)
         form.addRow("Channel:", self._channel_spin)
@@ -135,19 +130,17 @@ class PyroPanel(QGroupBox):
         self._connect_btn.setText("Disconnect")
         idnr = info.get("idnr", "")
         port = info.get("port", "")
+        text = f"Connected: {port}"
         if idnr:
-            self._status_lbl.setText(f"Connected: {port}\nIDNR: {idnr}")
-        else:
-            self._status_lbl.setText(f"Connected: {port}")
-        self._status_lbl.setStyleSheet("color: #a6e3a1;")
+            text += f"\nIDNR: {idnr}"
+        self._status_lbl.set_status(text, "ok")
         self._refresh_enabled()
 
     def on_disconnected(self) -> None:
         self._connected = False
         self._streaming = False
         self._connect_btn.setText("Connect")
-        self._status_lbl.setText("Not connected")
-        self._status_lbl.setStyleSheet("color: #cdd6f4;")
+        self._status_lbl.set_status("Not connected")
         self._refresh_enabled()
 
     def on_streaming_started(self) -> None:
@@ -159,8 +152,7 @@ class PyroPanel(QGroupBox):
         self._refresh_enabled()
 
     def on_error(self, msg: str) -> None:
-        self._status_lbl.setText(msg)
-        self._status_lbl.setStyleSheet("color: #f38ba8;")
+        self._status_lbl.set_status(msg, "error")
 
     def _refresh_enabled(self) -> None:
         for w in (self._port_combo, self._channel_spin, self._refresh_btn):

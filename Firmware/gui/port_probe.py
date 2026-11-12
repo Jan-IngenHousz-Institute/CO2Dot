@@ -2,9 +2,10 @@
 port_probe.py — safe serial-port autodetection for the CO2Dot/MiniPAR, the
 Pyroscience optode, and the ambyte ESP32 (Serial Scripting target).
 
-Every probe opens the port with DTR/RTS de-asserted BEFORE open(), so a
+Every probe opens the port with DTR/RTS held de-asserted (see
+device_manager.open_serial — how that is achieved differs per OS), so a
 device that auto-resets on a normal open (ESP32-style USB bridges — both
-the ambyte and the CO2Dot) is never rebooted by the probe itself.
+the ambyte and the CO2Dot) is not rebooted by the probe itself.
 
 The probe runs two phases so that every known device receives only
 COMPLETELY TERMINATED command lines and is left with a clean input buffer
@@ -17,7 +18,9 @@ device's next real '#IDNR\\r' command and make the subsequent connect fail):
                           1's bytes into a complete (ignored) line, then
                           'hello' → {"device": "CO2Dot", ...}
 
-Ports that are already open elsewhere raise on open() and are skipped.
+Ports that are already open elsewhere raise on open() and are skipped. A
+port the user has no right to open (Linux without the serial group) is
+reported separately, so "no devices found" is never the whole answer there.
 """
 
 from __future__ import annotations
@@ -26,6 +29,8 @@ import time
 
 import serial
 from PySide6.QtCore import QThread, Signal
+
+import device_manager
 
 PROBE_BAUD = 115200
 PROBE_READ_TIMEOUT_S = 0.15
@@ -38,17 +43,20 @@ CO2DOT_MARKERS = ("CO2Dot", "MiniPAR")
 
 def probe_port(port: str) -> tuple[str, str] | None:
     """Probe one port. Returns ("pyro", idnr), ("ambyte", ""),
-    ("co2dot", device_name) or None."""
+    ("co2dot", device_name) or None.
+
+    Raises PermissionError if the OS denies access to the port."""
     try:
-        ser = serial.Serial()
-        ser.port = port
-        ser.baudrate = PROBE_BAUD
-        ser.timeout = PROBE_READ_TIMEOUT_S
-        ser.write_timeout = 0.5
-        ser.dtr = False        # don't drive IO0
-        ser.rts = False        # don't drive EN → no auto-reset
-        ser.open()
-    except (serial.SerialException, OSError):
+        ser = device_manager.open_serial(
+            port, PROBE_BAUD,
+            timeout=PROBE_READ_TIMEOUT_S,
+            write_timeout=0.5,
+            quiet_lines=True,  # don't drive IO0/EN → no auto-reset
+        )
+    except (serial.SerialException, OSError) as exc:
+        if device_manager.is_permission_denied(exc):
+            raise PermissionError(
+                device_manager.describe_open_error(port, exc)) from exc
         return None            # in use or gone — skip
     try:
         ser.reset_input_buffer()
@@ -99,7 +107,9 @@ class PortProbeThread(QThread):
     port_checked  = Signal(str, str)   # port, kind ("pyro"|"ambyte"|"co2dot"|"")
     finished_scan = Signal(dict)       # {"co2dot": (port, device)|None,
                                        #  "pyro": (port, idnr)|None,
-                                       #  "ambyte": port|None}
+                                       #  "ambyte": port|None,
+                                       #  "denied": str}  ("" or the reason
+                                       #  a port could not be opened)
 
     def __init__(self, ports, parent=None):
         super().__init__(parent)
@@ -107,10 +117,15 @@ class PortProbeThread(QThread):
 
     def run(self) -> None:
         found = {"co2dot": None, "pyro": None, "ambyte": None}
+        denied = ""
         for port in self._ports:
             if all(v is not None for v in found.values()):
                 break
-            res = probe_port(port)
+            try:
+                res = probe_port(port)
+            except PermissionError as exc:
+                denied = denied or str(exc)
+                res = None
             self.port_checked.emit(port, res[0] if res else "")
             if res is None:
                 continue
@@ -121,4 +136,5 @@ class PortProbeThread(QThread):
                 found["pyro"] = (port, info)
             elif kind == "ambyte" and found["ambyte"] is None:
                 found["ambyte"] = port
+        found["denied"] = denied
         self.finished_scan.emit(found)

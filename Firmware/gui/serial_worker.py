@@ -13,6 +13,7 @@ import serial
 
 from PySide6.QtCore import QThread, Signal
 
+import device_manager
 from protocol import classify_line, CMD_STATUS
 from device_manager import BAUD_RATE
 
@@ -68,16 +69,16 @@ class SerialWorker(QThread):
 
     def run(self) -> None:
         try:
-            self._ser = serial.Serial(
+            self._ser = device_manager.open_serial(
                 self._port, BAUD_RATE,
                 timeout=0.1,          # 100 ms readline timeout
-                write_timeout=1.0,
             )
             self._ser.reset_input_buffer()
             # Confirm device presence
             self._ser.write(b"hello\n")
-        except serial.SerialException as exc:
-            self.error_received.emit(f"Cannot open {self._port}: {exc}")
+        except (serial.SerialException, OSError) as exc:
+            self.error_received.emit(
+                device_manager.describe_open_error(self._port, exc))
             self._running = False
             return
 
