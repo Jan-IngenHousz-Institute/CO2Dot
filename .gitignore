@@ -44,3 +44,6 @@ Lib/
 Scripts/Li-Control/co2dot_data/
 Scripts/Li-Control/old
 
+pyvenv.cfg
+
+Kicad/CO2Dot-ambyte

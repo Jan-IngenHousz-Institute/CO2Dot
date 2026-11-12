@@ -529,6 +529,7 @@ class Run:
         self.recent: deque = deque(maxlen=int(max(protocol.drift_window_s, 60) / max(cadence_s, 0.1)) + 5)
         self.cycle = 0
         self.status = "new"
+        self.on_cycle = None            # optional callback(line_dict) per logged cycle, e.g. an openJII publisher
         self._write_meta(meta_extra or {})
 
     # -- files ------------------------------------------------------------- #
@@ -603,6 +604,12 @@ class Run:
                                     for d, h in self.dots.items()}}
                 f.write(json.dumps(line, default=_json_default) + "\n"); f.flush()
                 self.recent.append(line)
+                if self.on_cycle is not None:
+                    try:
+                        self.on_cycle(line)
+                    except Exception as e:          # a publisher must never stall or kill the logger
+                        if self.cycle % 50 == 0:
+                            self.event("on_cycle_error", error=str(e)[:200])
                 self.cycle += 1
                 t_next += self.cadence_s
                 sleep = t_next - time.monotonic()
