@@ -1,6 +1,7 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include "app/commands.h"
+#include "app/identity.h"
 #include "app/response.h"
 #include "app/bme68x_api.h"
 #include "app/debug_api.h"
@@ -14,7 +15,8 @@ bool jsonOutputMode = false;
 // `help.keys()` (command names) for free. Keep this in sync with the dispatch
 // branches below.
 static void fill_help(JsonObject h) {
-  h["hello"]           = "device identity -> {device,version}";
+  h["hello"]           = "device identity -> {device,version,mac}";
+  h["info"]            = "openJII identity -> {device_name,device_type,device_id,firmware_version}";
   h["env"]             = "read BME68x environment (T,P,H,gas)";
   h["i2c_scan"]        = "scan the I2C bus for device addresses";
   h["spec"]            = "read calibrated spectrometer channels";
@@ -32,6 +34,15 @@ static void fill_help(JsonObject h) {
   h["help"]            = "list commands; help.<cmd> for one, help.keys() for names";
 }
 
+void fill_openjii_info(JsonObject data) {
+  char mac[18];
+  format_device_mac(ESP.getEfuseMac(), mac);
+  data["device_name"]      = "CO2Dot";
+  data["device_type"]      = "co2dot";
+  data["device_id"]        = mac;
+  data["firmware_version"] = CO2DOT_FW_VERSION;
+}
+
 void handleCommandText(const String &cmd) {
   // Split off an optional dot-path query (LINE mode). Command identifiers use
   // [A-Za-z0-9_], so the first '.' unambiguously begins the path. Action
@@ -42,9 +53,17 @@ void handleCommandText(const String &cmd) {
   g_requestPath = (dot >= 0) ? cmd.substring(dot + 1) : String();
 
   if (name == "hello") {
+    char mac[18];
+    format_device_mac(ESP.getEfuseMac(), mac);
     JsonDocument doc;
     doc["device"]  = "CO2Dot";
-    doc["version"] = "1.0";
+    doc["version"] = CO2DOT_FW_VERSION;
+    doc["mac"]     = mac;
+    respond(doc);
+
+  } else if (name == "info") {
+    JsonDocument doc;
+    fill_openjii_info(doc.to<JsonObject>());
     respond(doc);
 
   } else if (name == "help") {
