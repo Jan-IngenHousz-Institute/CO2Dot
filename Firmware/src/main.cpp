@@ -59,6 +59,25 @@ static bool HandleJson(const char *json, size_t len) {
     return false;
   }
 
+  // openJII identity probe: identifyDevice() sends {"command":"INFO"} and
+  // expects one bare {"status":"success","data":{...}} line, not the
+  // measurement envelope.
+  if (doc.is<JsonObject>() && doc["command"].is<const char *>()) {
+    String command = doc["command"].as<const char *>();
+    command.toUpperCase();
+    JsonDocument reply;
+    if (command == "INFO") {
+      reply["status"] = "success";
+      fill_openjii_info(reply["data"].to<JsonObject>());
+    } else {
+      reply["status"] = "error";
+      reply["error"]  = "unknown_command";
+    }
+    serializeJson(reply, Serial);
+    Serial.print('\n');
+    return true;
+  }
+
   serialJsonInit();
   bool firstOut = true;
   bool handledAny = false;

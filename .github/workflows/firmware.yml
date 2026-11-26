@@ -1,0 +1,51 @@
+name: Build firmware
+
+on:
+  pull_request:
+    paths:
+      - "Firmware/**"
+      - "!Firmware/gui/**"
+      - ".github/workflows/firmware.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Firmware/**"
+      - "!Firmware/gui/**"
+      - ".github/workflows/firmware.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Firmware
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO
+        run: python -m pip install --disable-pip-version-check platformio==6.1.19
+
+      - name: Build both PCB variants
+        env:
+          CO2DOT_RELEASE_VERSION: ci-${{ github.sha }}
+        run: pio run -e usb -e uart
+
+      - name: Assemble release-shaped assets
+        run: python3 tools/assemble_release.py "ci-${{ github.sha }}" dist
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: co2dot-firmware-${{ github.sha }}
+          path: Firmware/dist/
+          if-no-files-found: error
+          retention-days: 30
