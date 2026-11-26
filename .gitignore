@@ -47,3 +47,6 @@ Scripts/Li-Control/old
 pyvenv.cfg
 
 Kicad/CO2Dot-ambyte
+
+# Firmware release assets (tools/assemble_release.py)
+Firmware/dist/

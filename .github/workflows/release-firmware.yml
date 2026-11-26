@@ -1,0 +1,78 @@
+name: Release firmware
+
+# Push a tag fw/vMAJOR.MINOR.PATCH on main to publish CO2Dot firmware. openJII
+# lists a family's firmware from this repository's published GitHub releases,
+# so a firmware release carries co2dot-fw-vX.Y.Z.bin plus the flash manifest.
+# GUI (gui/v*) and hardware (hw/v*) tags are separate and never trigger this.
+
+on:
+  push:
+    tags:
+      - "fw/v*"
+
+concurrency:
+  group: firmware-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Firmware
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check the tag
+        id: tag
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        working-directory: .
+        run: |
+          set -euo pipefail
+          if [[ ! "${TAG}" =~ ^fw/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::Firmware tags must look like fw/v1.2.3, got ${TAG}"
+            exit 1
+          fi
+          VERSION="${BASH_REMATCH[1]}"
+          # Release only commits that are on main.
+          git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "::error::Release ${TAG} already exists"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO
+        run: python -m pip install --disable-pip-version-check platformio==6.1.19
+
+      - name: Build both PCB variants
+        env:
+          CO2DOT_RELEASE_VERSION: ${{ steps.tag.outputs.version }}
+        run: pio run -e usb -e uart
+
+      - name: Assemble and verify assets
+        run: python3 tools/assemble_release.py "${{ steps.tag.outputs.version }}" dist
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          gh release create "${TAG}" dist/* \
+            --verify-tag \
+            --latest=false \
+            --title "CO2Dot firmware v${VERSION}" \
+            --notes "Firmware v${VERSION}. Flash with manifest.json (esp32c3): bootloader 0x0, partitions 0x8000, boot_app0 0xe000, co2dot-fw-v${VERSION}.bin 0x10000. co2dot-uart-fw-v${VERSION}.bin is the UART PCB variant."
